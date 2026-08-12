@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma, getCurrentUser } from "@/lib/db";
-import { parseDocument } from "@/lib/parser";
+import { parseDocument, ParseError } from "@/lib/parser";
 import { putObject } from "@/lib/storage";
 
 const schema = z.object({
@@ -45,7 +45,18 @@ export async function POST(req: Request) {
     },
   });
 
-  const { parsed: result, provider } = await parseDocument(kind, { data, mime });
+  let result, provider;
+  try {
+    ({ parsed: result, provider } = await parseDocument(kind, { data, mime }));
+  } catch (err) {
+    await prisma.fileAsset.update({
+      where: { id: file.id },
+      data: { parseStatus: "failed" },
+    });
+    const message = err instanceof ParseError ? err.message : "Belge okunamadı. Lütfen tekrar deneyin.";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
+
   const confidence = "confidence" in result ? result.confidence : 0.95;
 
   await prisma.fileAsset.update({
