@@ -1,7 +1,8 @@
 # MetaCoach — Oturum Devir Dokümanı (Handoff)
 
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
-> Tarih: 2026-08-12 · Durum: **Faz 0–3 tamamlandı ve doğrulandı**, çalışır durumda.
+> Tarih: 2026-08-12 · Durum: **Faz 0–3 + Faz 4 (A grubu) tamamlandı ve doğrulandı**, çalışır durumda.
+> Faz 4 kod çalışması `faz4-go-live` git branch'inde. Kalanlar hesap/secret veya hukuki (bkz. §10).
 
 ---
 
@@ -139,6 +140,14 @@ README.md                     # kurulum + go-live + KVKK
 
 **Build:** 24 route + middleware, tip hatası yok.
 
+- **Faz 4 A grubu** ✅ (built + verified 2026-08-12, branch `faz4-go-live`):
+  - **Postgres geçişi otomatik:** `scripts/set-db-provider.mjs` `DATABASE_URL`'e göre datasource'u sqlite↔postgresql ayarlar (elle şema düzenleme yok). Commit'li Postgres init migration (`prisma/migrations/0_init`, 14 tablo) + `npm run db:migrate`/`db:deploy` + `docker-compose.yml`.
+  - **CI/CD:** `.github/workflows/ci.yml` — typecheck + lint + build + Postgres migrasyon smoke testi.
+  - **Sentry:** server/edge/client config + `instrumentation.ts` + `global-error.tsx`; `SENTRY_DSN` yoksa tamamen inert (@sentry/nextjs v8).
+  - **Object storage:** `src/lib/storage.ts` (R2/S3, env-gated; yoksa `./storage` yerel disk) → `ingest` route byte'ları saklar.
+  - **Health + sertleştirme:** `/api/health` (DB ping, auth'suz — `auth.config` PUBLIC_PREFIXES'e eklendi), güvenlik başlıkları (CSP/HSTS/X-Frame/nosniff/Referrer/Permissions) `next.config.mjs`, `vercel.json` (build'de migrate deploy). Canlı doğrulandı: health 200, header'lar var, login/redirect sağlam. Build 25 route yeşil.
+  - **Repo git'e alındı** (baseline + faz4 commit'leri). Push edilmedi (remote yok).
+
 ---
 
 ## 8. Ortam değişkenleri (.env)
@@ -167,14 +176,14 @@ README.md                     # kurulum + go-live + KVKK
 
 ## 10. Sıradaki adımlar (kullanıcıya sunulan seçenekler)
 
-Kullanıcı henüz seçmedi — yeni oturumda sor:
+Faz 4 A grubu (kod) tamam. Sıradaki seçenekler:
+- **(b1) Faz 4 B grubu — hesap/deploy adımları:** Neon/Supabase Postgres + Vercel projesi + domain + secret'lar
+  (prod `AUTH_SECRET`/VAPID, R2 anahtarları, Sentry DSN) girip **canlıya alma**. Ben adım adım rehber + komut veririm, sen uygularsın.
 - **(a) Wearable senkron** — Terra/Vital ile Apple Health + Garmin (adım/nabız/aktif kalori). (Faz 3'te ertelendi.)
-- **(b) Faz 4 go-live hazırlığı** — managed dağıtım + CI/CD (GitHub Actions) + SQLite→Postgres geçişi + Sentry/monitoring.
 - **(c) Gerçek Claude parse'ı canlı deneme** — kullanıcının `ANTHROPIC_API_KEY`'i ile `PARSE_PROVIDER=claude`.
 - **(d) UI/akış ince ayarı** — dashboard kartları, marka rengi (şu an jade-teal + amber), ek ekranlar.
-- **Faz 4 kalanları:** KVKK/GDPR (aydınlatma metni, VERBİS, denetim logu, rıza sürümleme, veri dışa aktarım/silme),
-  pentest, gerçek object storage (R2/S3), OAuth/e-posta doğrulama + şifre sıfırlama. Bunlar hukuki/operasyonel,
-  kullanıcı katılımı gerekir.
+- **Faz 4 kalanları (hukuki/operasyonel, kullanıcı katılımı):** KVKK/GDPR (aydınlatma metni, VERBİS, denetim logu,
+  rıza sürümleme, veri dışa aktarım/silme), pentest, CSP'yi nonce'a sıkılaştırma, OAuth/e-posta doğrulama + şifre sıfırlama.
 
 ---
 
