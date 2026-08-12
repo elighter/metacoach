@@ -86,7 +86,7 @@ function ChartTooltip({ active, payload, label }: any) {
 export function WeightEnergyChart({ data }: { data: ChartPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+      <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.28} />
@@ -101,10 +101,18 @@ export function WeightEnergyChart({ data }: { data: ChartPoint[] }) {
           minTickGap={40}
           tick={{ fontSize: 11 }}
         />
-        <YAxis yAxisId="w" domain={["dataMin - 1", "dataMax + 1"]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} width={38} />
+        <YAxis
+          yAxisId="w"
+          domain={[(min: number) => Math.floor(min) - 1, (max: number) => Math.ceil(max) + 1]}
+          tickLine={false}
+          axisLine={false}
+          tick={{ fontSize: 11 }}
+          width={34}
+          allowDecimals={false}
+        />
         <YAxis yAxisId="c" orientation="right" domain={[0, "dataMax + 600"]} hide />
-        <Tooltip content={<ChartTooltip />} />
-        <Bar yAxisId="c" dataKey="calories" fill="var(--accent)" opacity={0.22} radius={[3, 3, 0, 0]} maxBarSize={16} />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--surface-2)", opacity: 0.5 }} />
+        <Bar yAxisId="c" dataKey="calories" fill="var(--accent)" opacity={0.22} radius={[3, 3, 0, 0]} maxBarSize={16} isAnimationActive={false} />
         <Area
           yAxisId="w"
           type="monotone"
@@ -114,6 +122,7 @@ export function WeightEnergyChart({ data }: { data: ChartPoint[] }) {
           fill="url(#wgrad)"
           dot={false}
           connectNulls
+          isAnimationActive={false}
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -126,7 +135,14 @@ export function TdeeHistoryChart({ data }: { data: { label: string; tdee: number
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-        <YAxis domain={["dataMin - 120", "dataMax + 120"]} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} width={52} />
+        <YAxis
+          domain={[(min: number) => Math.floor(min) - 120, (max: number) => Math.ceil(max) + 120]}
+          tickLine={false}
+          axisLine={false}
+          tick={{ fontSize: 11 }}
+          width={44}
+          allowDecimals={false}
+        />
         <Tooltip
           content={({ active, payload, label }: any) =>
             active && payload?.length ? (
@@ -137,7 +153,7 @@ export function TdeeHistoryChart({ data }: { data: { label: string; tdee: number
             ) : null
           }
         />
-        <Line type="monotone" dataKey="tdee" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--primary)" }} />
+        <Line type="monotone" dataKey="tdee" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--primary)" }} isAnimationActive={false} />
       </LineChart>
     </ResponsiveContainer>
   );
