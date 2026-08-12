@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck · lint · build
+    runs-on: ubuntu-latest
+    env:
+      # Build-time only; no real DB is contacted. db:provider keeps SQLite here.
+      DATABASE_URL: "file:./ci.db"
+      AUTH_SECRET: "ci-placeholder-secret-not-used-at-runtime"
+      AUTH_TRUST_HOST: "true"
+      PARSE_PROVIDER: "mock"
+      # Sentry stays inert without a DSN; build wrapper is a no-op without a token.
+      SENTRY_AUTH_TOKEN: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npm run db:provider && npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  migrations:
+    name: postgres migrations apply
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: metacoach
+          POSTGRES_PASSWORD: metacoach
+          POSTGRES_DB: metacoach
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U metacoach"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: "postgresql://metacoach:metacoach@localhost:5432/metacoach?schema=public"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Verifies the committed Postgres migrations apply cleanly on a fresh DB.
+      - run: npm run db:deploy

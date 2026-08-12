@@ -1,0 +1,27 @@
+# Optional: local PostgreSQL matching the production database.
+# Use only if you want to test the Postgres migration path locally.
+#   docker compose up -d
+#   DATABASE_URL="postgresql://metacoach:metacoach@localhost:5432/metacoach?schema=public" npm run db:deploy
+#   DATABASE_URL="postgresql://metacoach:metacoach@localhost:5432/metacoach?schema=public" npm run db:seed
+# The default local dev flow still uses SQLite and needs none of this.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: metacoach-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: metacoach
+      POSTGRES_PASSWORD: metacoach
+      POSTGRES_DB: metacoach
+    ports:
+      - "5432:5432"
+    volumes:
+      - metacoach_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metacoach -d metacoach"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  metacoach_pgdata:
