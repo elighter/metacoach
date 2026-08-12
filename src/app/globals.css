@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ───────── Design tokens (jade-teal + amber, dark/light) ───────── */
+:root {
+  --ground: #f6f8f7;
+  --surface: #ffffff;
+  --surface-2: #f0f4f2;
+  --surface-3: #e9edec;
+  --ink: #0e1613;
+  --ink-2: #48524e;
+  --ink-3: #727c77;
+  --border: #e1e7e4;
+  --border-strong: #cdd5d1;
+  --primary: #0e9e8e;
+  --primary-ink: #0a7062;
+  --primary-wash: #e4f3f0;
+  --accent: #c07322;
+  --accent-wash: #f6ecdd;
+  --good: #2a9d5c;
+  --good-wash: #e4f2e9;
+  --warn: #b9861a;
+  --warn-wash: #f6eeda;
+  --crit: #cf4e33;
+  --crit-wash: #f8e7e2;
+}
+
+.dark {
+  --ground: #090d0c;
+  --surface: #101615;
+  --surface-2: #161e1c;
+  --surface-3: #1c2623;
+  --ink: #e9eeeb;
+  --ink-2: #a1aca7;
+  --ink-3: #79847f;
+  --border: #1f2926;
+  --border-strong: #2c3733;
+  --primary: #2dd4bf;
+  --primary-ink: #5eead4;
+  --primary-wash: #0e2723;
+  --accent: #e0a85c;
+  --accent-wash: #2a2013;
+  --good: #34c77b;
+  --good-wash: #0f2519;
+  --warn: #e0b44a;
+  --warn-wash: #2a2410;
+  --crit: #f06b4e;
+  --crit-wash: #2c130d;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-feature-settings: "cv11", "ss01";
+    letter-spacing: -0.006em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::selection {
+    background: var(--primary-wash);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-border bg-surface shadow-card;
+  }
+  .kicker {
+    @apply font-mono text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-ink-3;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3.5 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-transparent bg-primary text-white hover:opacity-90;
+    background: var(--primary);
+    color: #fff;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent hover:bg-surface-2;
+  }
+  .input {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-3 focus:border-primary;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-2;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+}
+
+/* Recharts theming hooks */
+.recharts-cartesian-grid line {
+  stroke: var(--border);
+}
+.recharts-text {
+  fill: var(--ink-3);
+}
+.recharts-tooltip-wrapper {
+  outline: none;
+}

@@ -1,0 +1,213 @@
+// MetaCoach — Prisma schema (POC on SQLite; swap datasource to Postgres for prod)
+// SQLite notes: no native enums/arrays → enum-like values are String,
+// list/JSON payloads are stored as JSON strings, money-free numerics use Float.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String?
+  dob          DateTime?
+  sex          String?   // male | female | other
+  heightCm     Float?
+  activityBase String    @default("moderate") // sedentary|light|moderate|active|athlete
+  goal         String    @default("maintain") // cut | maintain | bulk
+  unitPref     String    @default("metric")   // metric | imperial
+  locale       String    @default("tr")
+  themePref    String    @default("system")   // system | light | dark
+  disclaimerAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  labResults          LabResult[]
+  biometrics          Biometric[]
+  meals               Meal[]
+  dailyLogs           DailyLog[]
+  metabolismEstimates MetabolismEstimate[]
+  files               FileAsset[]
+  deviceConnections   DeviceConnection[]
+  consents            Consent[]
+  dashboardLayout     DashboardLayout?
+  settings            Settings?
+  pushSubscriptions   PushSubscription[]
+}
+
+model FileAsset {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind            String // lab_pdf | inbody_img
+  fileName        String
+  mime            String
+  size            Int
+  storageKey      String
+  parseStatus     String   @default("pending") // pending | processing | done | failed
+  parseConfidence Float?
+  createdAt       DateTime @default(now())
+
+  labResult LabResult?
+  biometric Biometric?
+}
+
+model LabResult {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileId          String?   @unique
+  file            FileAsset? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  panelName       String
+  labName         String?
+  collectedAt     DateTime?
+  parseConfidence Float?
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  biomarkers LabBiomarker[]
+}
+
+model LabBiomarker {
+  id          String    @id @default(cuid())
+  labResultId String
+  labResult   LabResult @relation(fields: [labResultId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  value       Float
+  unit        String
+  refLow      Float?
+  refHigh     Float?
+  flag        String    @default("normal") // low | normal | high
+  confidence  Float     @default(1)
+}
+
+model Biometric {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileId           String?   @unique
+  file             FileAsset? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  source           String // inbody | mi_scale | manual | wearable
+  measuredAt       DateTime
+  weightKg         Float
+  bodyFatPct       Float?
+  skeletalMuscleKg Float?
+  visceralFat      Float?
+  bodyWaterPct     Float?
+  bmrDevice        Float?
+  impedance        Float? // ohms — Mi Scale bioimpedance
+  createdAt        DateTime  @default(now())
+}
+
+model Meal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loggedAt  DateTime
+  mealType  String // breakfast | lunch | dinner | snack
+  name      String
+  totalKcal Float
+  proteinG  Float    @default(0)
+  carbG     Float    @default(0)
+  fatG      Float    @default(0)
+  source    String   @default("manual") // manual | barcode | photo | api
+  createdAt DateTime @default(now())
+}
+
+model DailyLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime
+  caloriesIn    Float    @default(0)
+  activeKcal    Float    @default(0)
+  steps         Int      @default(0)
+  weightTrend   Float?
+  tdeeDynamic   Float?
+  energyBalance Float?
+
+  @@unique([userId, date])
+}
+
+model MetabolismEstimate {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  computedAt  DateTime @default(now())
+  windowDays  Int
+  tdeeKcal    Float
+  ciLow       Float
+  ciHigh      Float
+  method      String // ewma | kalman
+  weightSlope Float?
+  rhoUsed     Float?
+}
+
+model DeviceConnection {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   String // mi_scale | apple_health | garmin
+  externalId String?
+  status     String    @default("connected") // connected | disconnected | error
+  lastSyncAt DateTime?
+  meta       String? // JSON string
+  createdAt  DateTime  @default(now())
+}
+
+model Consent {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // kvkk | gdpr | health_data
+  version   String
+  grantedAt DateTime  @default(now())
+  revokedAt DateTime?
+}
+
+model FoodItem {
+  id             String  @id @default(cuid())
+  name           String
+  brand          String?
+  barcode        String?
+  kcalPer100g    Float
+  proteinPer100g Float   @default(0)
+  carbPer100g    Float   @default(0)
+  fatPer100g     Float   @default(0)
+}
+
+model DashboardLayout {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  widgets   String // JSON: [{ id, visible, order }]
+  updatedAt DateTime @updatedAt
+}
+
+model Settings {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifyWeighIn  Boolean  @default(true)
+  notifyMeals    Boolean  @default(false)
+  weeklyReport   Boolean  @default(true)
+  tdeeWindowDays Int      @default(21)
+  updatedAt      DateTime @updatedAt
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
