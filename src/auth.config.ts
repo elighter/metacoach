@@ -2,7 +2,7 @@ import type { NextAuthConfig } from "next-auth";
 
 // Edge-safe config (no Prisma / bcrypt) — used by middleware and shared with the
 // full server auth. Route protection lives in the `authorized` callback.
-const PUBLIC_PREFIXES = ["/login", "/register", "/api/register"];
+const PUBLIC_PREFIXES = ["/login", "/register", "/api/register", "/api/health"];
 
 export const authConfig = {
   pages: { signIn: "/login" },
