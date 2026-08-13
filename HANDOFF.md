@@ -139,6 +139,15 @@ README.md                     # kurulum + go-live + KVKK
 
 **Build:** 24 route + middleware, tip hatası yok.
 
+- **Faz 4 (go-live temeli) — başladı (2026-08-13):**
+  - `/api/health` liveness/readiness probe (DB kontrolü, 200/503; middleware'de public). Standalone server ile test: HTTP 200 `{db:up}`.
+  - **CI:** `.github/workflows/ci.yml` — `npm ci → prisma generate → tsc --noEmit → build` (push master + PR).
+  - **Docker:** `Dockerfile` (multi-stage, standalone, non-root, HEALTHCHECK) + `.dockerignore`; `next.config` `output:"standalone"`.
+  - **Scriptler:** `db:deploy` (prisma migrate deploy), `typecheck`.
+  - **`DEPLOY.md`:** go-live runbook (Vercel/Fly/Railway, SQLite→Postgres tek satır geçiş, env tablosu, kontrol listesi).
+  - Branch: `claude/continue-from-where-left-9p0l8n` (commit 2d56890, push edildi).
+  - **Kalan (sır/kullanıcı gerektirir):** Postgres bağlantısı + ilk migration, prod env'ler, Sentry DSN, R2 storage, KVKK, OAuth/e-posta doğrulama.
+
 ---
 
 ## 8. Ortam değişkenleri (.env)
