@@ -1,14 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 // Real document parsing with Claude Vision (PARSE_PROVIDER="claude").
-// Uses a single forced tool call (strict) against claude-opus-5 to extract
-// structured lab / InBody data. Requires ANTHROPIC_API_KEY.
-// Falls back to mock via src/lib/parser.ts.
+// Uses a single forced tool call (strict) to extract structured lab / InBody
+// data. Requires ANTHROPIC_API_KEY. Falls back to mock via src/lib/parser.ts.
+//
+// Model: Claude Sonnet 5 by default — the cost/capability sweet spot for this
+// bounded, vision-based extraction (high-resolution vision reads dense lab
+// tables and InBody screenshots; ~60% cheaper than Opus 5). Override with
+// CLAUDE_PARSE_MODEL (e.g. claude-haiku-4-5 for lowest cost, claude-opus-5 for
+// maximum accuracy). Thinking is disabled: the task is a deterministic
+// structured extraction with a forced tool call, so adaptive reasoning would
+// only add latency and token cost.
 // ─────────────────────────────────────────────────────────────
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { ParsedLab, ParsedInbody } from "@/lib/mock-parser";
 
-const MODEL = "claude-opus-5";
+const MODEL = process.env.CLAUDE_PARSE_MODEL || "claude-sonnet-5";
 
 const labSchema = {
   type: "object" as const,
@@ -74,6 +81,7 @@ export async function parseLabWithClaude(dataBase64: string): Promise<ParsedLab>
   const res = await anthropic().messages.create({
     model: MODEL,
     max_tokens: 8000,
+    thinking: { type: "disabled" },
     tools: [{ name: "record_lab", description: "Kan tahlili sonucunu kaydet", input_schema: labSchema, strict: true } as Anthropic.Tool],
     tool_choice: { type: "tool", name: "record_lab" },
     messages: [
@@ -104,6 +112,7 @@ export async function parseInbodyWithClaude(
   const res = await anthropic().messages.create({
     model: MODEL,
     max_tokens: 2000,
+    thinking: { type: "disabled" },
     tools: [{ name: "record_inbody", description: "InBody sonucunu kaydet", input_schema: inbodySchema, strict: true } as Anthropic.Tool],
     tool_choice: { type: "tool", name: "record_inbody" },
     messages: [
