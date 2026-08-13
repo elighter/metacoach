@@ -2,11 +2,13 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud, FileText, ScanLine, Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
+import { UploadCloud, FileText, ScanLine, Loader2, CheckCircle2, ArrowLeft, AlertTriangle, Sparkles } from "lucide-react";
 import { cn, fmt } from "@/lib/utils";
 
 type Kind = "lab_pdf" | "inbody_img";
-type Stage = "idle" | "parsing" | "review" | "saving" | "done";
+type Stage = "idle" | "parsing" | "review" | "saving" | "done" | "error";
+
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 interface Biomarker {
   code: string; name: string; value: number; unit: string;
@@ -26,6 +28,8 @@ export default function UploadPage() {
   const [fileName, setFileName] = useState("");
   const [fileId, setFileId] = useState("");
   const [confidence, setConfidence] = useState(0);
+  const [provider, setProvider] = useState<"mock" | "claude">("mock");
+  const [errorMsg, setErrorMsg] = useState("");
   const [lab, setLab] = useState<{ panelName: string; labName: string; collectedAt: string; biomarkers: Biomarker[] } | null>(null);
   const [inbody, setInbody] = useState<any>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -40,35 +44,54 @@ export default function UploadPage() {
     });
   }
 
+  function validate(file: File): string | null {
+    if (file.size > MAX_BYTES) return `Dosya çok büyük (${fmt(file.size / 1024 / 1024, 1)} MB). En fazla 10 MB.`;
+    if (file.size === 0) return "Dosya boş görünüyor.";
+    if (kind === "lab_pdf" && file.type && file.type !== "application/pdf")
+      return "Kan tahlili için PDF bekleniyor. InBody görseli için sekmeyi değiştirin.";
+    if (kind === "inbody_img" && file.type && !file.type.startsWith("image/"))
+      return "InBody için görsel (JPG/PNG) bekleniyor. PDF için sekmeyi değiştirin.";
+    return null;
+  }
+
   async function handleFile(file: File) {
+    const invalid = validate(file);
+    if (invalid) {
+      setFileName(file.name);
+      setErrorMsg(invalid);
+      setStage("error");
+      return;
+    }
     setFileName(file.name);
     setStage("parsing");
-    const b64 = await readAsBase64(file); // sent to the real Claude parser; mock ignores it
-    const res = await fetch("/api/ingest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        kind,
-        fileName: file.name,
-        size: file.size,
-        mime: file.type,
-        data: b64,
-      }),
-    });
-    const data = await res.json();
-    setFileId(data.fileId);
-    setConfidence(data.parsed.confidence ?? 0.95);
-    if (kind === "lab_pdf") {
-      setLab({
-        panelName: data.parsed.panelName,
-        labName: data.parsed.labName,
-        collectedAt: data.parsed.collectedAt?.slice(0, 10) ?? "",
-        biomarkers: data.parsed.biomarkers,
+    try {
+      const b64 = await readAsBase64(file); // sent to the real Claude parser; mock ignores it
+      const res = await fetch("/api/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, fileName: file.name, size: file.size, mime: file.type, data: b64 }),
       });
-    } else {
-      setInbody(data.parsed);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Belge okunamadı. Lütfen tekrar deneyin.");
+
+      setFileId(data.fileId);
+      setProvider(data.provider ?? "mock");
+      setConfidence(data.parsed.confidence ?? 0.95);
+      if (kind === "lab_pdf") {
+        setLab({
+          panelName: data.parsed.panelName,
+          labName: data.parsed.labName,
+          collectedAt: data.parsed.collectedAt?.slice(0, 10) ?? "",
+          biomarkers: data.parsed.biomarkers,
+        });
+      } else {
+        setInbody(data.parsed);
+      }
+      setStage("review");
+    } catch (e: any) {
+      setErrorMsg(e?.message ?? "Beklenmeyen bir hata oluştu.");
+      setStage("error");
     }
-    setStage("review");
   }
 
   async function confirm() {
@@ -87,7 +110,7 @@ export default function UploadPage() {
   }
 
   function reset() {
-    setStage("idle"); setLab(null); setInbody(null); setFileName("");
+    setStage("idle"); setLab(null); setInbody(null); setFileName(""); setErrorMsg("");
   }
 
   return (
@@ -95,7 +118,6 @@ export default function UploadPage() {
       <h1 className="text-2xl font-bold tracking-tight">Yükle &amp; AI ile Oku</h1>
       <p className="mt-1 text-sm text-ink-3">
         Kan tahlili PDF'ini veya InBody görselini yükle; değerler AI ile okunur, sen onaylarsın.
-        <span className="ml-1 font-mono text-[0.7rem]">(POC: mock parser)</span>
       </p>
 
       {stage === "idle" && (
@@ -160,7 +182,7 @@ export default function UploadPage() {
 
       {stage === "review" && lab && (
         <div className="mt-6">
-          <ReviewHeader confidence={confidence} onBack={reset} />
+          <ReviewHeader confidence={confidence} provider={provider} onBack={reset} />
           <div className="card mt-3 p-4">
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Panel" value={lab.panelName} onChange={(v) => setLab({ ...lab, panelName: v })} />
@@ -204,7 +226,7 @@ export default function UploadPage() {
 
       {stage === "review" && inbody && (
         <div className="mt-6">
-          <ReviewHeader confidence={confidence} onBack={reset} />
+          <ReviewHeader confidence={confidence} provider={provider} onBack={reset} />
           <div className="card mt-3 grid gap-3 p-4 sm:grid-cols-3">
             <Field label="Ağırlık (kg)" type="number" value={String(inbody.weightKg)} onChange={(v) => setInbody({ ...inbody, weightKg: Number(v) })} />
             <Field label="Vücut yağı (%)" type="number" value={String(inbody.bodyFatPct)} onChange={(v) => setInbody({ ...inbody, bodyFatPct: Number(v) })} />
@@ -223,6 +245,18 @@ export default function UploadPage() {
         </div>
       )}
 
+      {stage === "error" && (
+        <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-crit/30 bg-crit-wash/40 p-12 text-center">
+          <AlertTriangle className="h-10 w-10 text-crit" />
+          <div className="text-lg font-semibold">Okuma başarısız</div>
+          <p className="max-w-md text-sm text-ink-2">{errorMsg}</p>
+          {fileName && <p className="font-mono text-xs text-ink-3">{fileName}</p>}
+          <div className="mt-2 flex gap-2">
+            <button className="btn btn-primary" onClick={reset}>Tekrar dene</button>
+          </div>
+        </div>
+      )}
+
       {stage === "done" && (
         <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-12 text-center">
           <CheckCircle2 className="h-10 w-10 text-good" />
@@ -238,11 +272,20 @@ export default function UploadPage() {
   );
 }
 
-function ReviewHeader({ confidence, onBack }: { confidence: number; onBack: () => void }) {
+function ReviewHeader({ confidence, provider, onBack }: { confidence: number; provider: "mock" | "claude"; onBack: () => void }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <button className="btn btn-ghost h-8" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Geri</button>
-      <span className="pill bg-primary-wash text-primary-ink">Genel güven %{Math.round(confidence * 100)}</span>
+      <div className="flex items-center gap-2">
+        <span
+          className={cn("pill", provider === "claude" ? "bg-primary-wash text-primary-ink" : "bg-surface-2 text-ink-3")}
+          title={provider === "claude" ? "Claude Vision ile okundu" : "Örnek (mock) veri — gerçek AI için ANTHROPIC_API_KEY gerekir"}
+        >
+          <Sparkles className="mr-1 h-3 w-3" />
+          {provider === "claude" ? "Claude Vision" : "Örnek veri (mock)"}
+        </span>
+        <span className="pill bg-primary-wash text-primary-ink">Genel güven %{Math.round(confidence * 100)}</span>
+      </div>
     </div>
   );
 }
