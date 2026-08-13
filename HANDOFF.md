@@ -13,7 +13,8 @@ Kan tahlili PDF'i ve InBody/akıllı tartı görsellerini **AI ile okur**, giyil
 kilo/yağ değişiminden **gerçek metabolizma hızını (Dynamic TDEE) öğrenir**. Apple-kalitesinde,
 kart tabanlı, dark/light, **kullanıcının özelleştirebildiği** dashboard.
 
-**Konum:** `/Users/emrecakmak/Projects/MetaCoach` (git repo değil — istenirse `git init`).
+**Konum:** `/Users/emrecakmak/Projects/MetaCoach` · **GitHub:** private repo `github.com/elighter/metacoach` (dallar: `master` baseline + `faz4-go-live`; PR #1 açık). Makine kapalıyken **Claude Code web** (claude.ai/code) ile devam edilebilir.
+> Not: Bu makinede `gh` kimliği macOS keyring'de — Bash aracı git/gh komutlarını **sandbox kapalı** çalıştırmalı, yoksa auth görünmez.
 **Görsel tasarım dokümanı (artifact):** https://claude.ai/code/artifact/0ea09d80-710a-4d0d-94f1-f81156dc8f4d
 
 ---
