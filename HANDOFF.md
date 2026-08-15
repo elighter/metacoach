@@ -1,8 +1,7 @@
 # MetaCoach — Oturum Devir Dokümanı (Handoff)
 
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
-> Tarih: 2026-08-12 · Durum: **Faz 0–3 + Faz 4 (A grubu) tamamlandı ve doğrulandı**, çalışır durumda.
-> Faz 4 kod çalışması `faz4-go-live` git branch'inde. Kalanlar hesap/secret veya hukuki (bkz. §10).
+> Tarih: 2026-08-15 · Durum: **Faz 0–4A tamamlandı, master'da, CI yeşil.** Deploy aşamasında — servis seçimleri yapıldı, Neon + Vercel kurulumu bekliyor.
 
 ---
 
@@ -30,25 +29,26 @@ kart tabanlı, dark/light, **kullanıcının özelleştirebildiği** dashboard.
 
 ## 3. Kilitli kararlar (kullanıcıdan)
 
-- **Dağıtım:** managed servisler (Vercel + Fly.io/Railway + Neon/Supabase + Upstash + Cloudflare R2).
+- **Dağıtım:** managed servisler (Vercel + Neon). Free tier ile başla.
 - **POC parse:** mock ile başla; gerçek Claude Vision opsiyonel (kod hazır, anahtar gerektirir).
 - **Sadece bireysel** (koç/multi-tenant yok).
 - Zorunlu özellikler: **Mi Body Composition Scale 2** entegrasyonu, **kişiselleştirilebilir dashboard**
   (sürükle-sırala + widget aç/kapat), **profil** (bilgiler saklanır) + **ayarlar**.
 - **Faz 3 öncelikleri (seçilen):** ① Gerçek AI parse (Claude), ② Kimlik doğrulama (Auth.js), ③ PWA + bildirim.
   **Wearable senkron (Terra/Vital) sonraya bırakıldı.**
+- **Cost-optimized AI parse:** Claude Sonnet 5 varsayılan model (Opus 5'ten ~%60 ucuz, high-res vision yeterli). `CLAUDE_PARSE_MODEL` env ile override edilebilir.
 
 ---
 
 ## 4. Mimari & teknoloji
 
 **POC = tek runtime** (hızlı çalışsın diye): Next.js 15 (App Router) + TypeScript + Tailwind v3 +
-Recharts + **Prisma/SQLite**. Üretimde Python/FastAPI mikroservisleri (OCR/AI, metabolizma), Redis/Celery,
-Postgres, object storage — tasarım dokümanında belgeli. **Prod'a geçiş: `schema.prisma`'da datasource'u
-`sqlite`→`postgresql` yap + `DATABASE_URL`'i değiştir (tek satır).**
+Recharts + **Prisma/SQLite**. Üretimde Postgres (Neon).
+
+Auto datasource switching: `scripts/set-db-provider.mjs` `DATABASE_URL`'e göre provider'ı sqlite↔postgresql yapar (elle şema düzenleme yok).
 
 Ana bağımlılıklar: next 15.1.6, react 18.3.1, prisma 6.2.1, recharts 2.15, @dnd-kit, lucide-react,
-next-auth ^5.0.0-beta.25, bcryptjs, web-push, @anthropic-ai/sdk ^0.116, zod ^3.25.76.
+next-auth ^5.0.0-beta.25, bcryptjs, web-push, @anthropic-ai/sdk ^0.116, zod ^3.25.76, @sentry/nextjs v8.
 
 ---
 
@@ -62,10 +62,9 @@ npm run dev          # http://localhost:3000
 ```
 
 **Demo giriş:** `emrecakmak@me.com` / `metacoach123`
-Diğer komutlar: `npm run build`, `npm run db:seed`, `npm run db:reset`.
+Diğer komutlar: `npm run build`, `npm run db:seed`, `npm run db:reset`, `npm run typecheck`.
 
-**Not:** Dev sunucusu bu oturumda arka planda çalışıyordu; yeni oturumda yeniden başlat.
-Auth/middleware değişikliklerinden sonra dev sunucusunu **yeniden başlat** (port 3000'i öldür + `npm run dev`).
+**Not:** Auth/middleware değişikliklerinden sonra dev sunucusunu **yeniden başlat** (port 3000'i öldür + `npm run dev`).
 
 ---
 
@@ -93,10 +92,11 @@ src/
       profile/ settings/
       dashboard/layout/       # widget yerleşimi kaydet
       push/subscribe/ push/test/   # web push
+      health/                 # DB ping, auth'suz
   components/
     app-shell.tsx             # sidebar + topbar + tema + çıkış + kullanıcı
     theme-provider.tsx        # system/light/dark, .dark class, no-flash
-    dashboard/dashboard-grid.tsx  # ⭐ dnd-kit sürükle-sırala + widget aç/kapat + kalıcılık
+    dashboard/dashboard-grid.tsx  # dnd-kit sürükle-sırala + widget aç/kapat + kalıcılık
     dashboard/widgets.tsx     # tüm widget render'ları
     charts.tsx                # Recharts: WeightEnergyChart, TdeeHistoryChart, Ring, Sparkline
     mi-scale-panel.tsx        # Web Bluetooth + simülatör
@@ -104,93 +104,128 @@ src/
     push-controls.tsx  pwa-register.tsx  recompute-button.tsx
   lib/
     db.ts                     # Prisma singleton + getCurrentUser (session'dan; auth'u dinamik import)
-    tdee.ts                   # ⭐ Dynamic TDEE motoru (EWMA + enerji dengesi + Katch-McArdle)
-    mi-scale.ts               # ⭐ BLE çözücü + Xiaomi kompozisyon matematiği (yaklaşım)
+    tdee.ts                   # Dynamic TDEE motoru (EWMA + enerji dengesi + Katch-McArdle)
+    mi-scale.ts               # BLE çözücü + Xiaomi kompozisyon matematiği (yaklaşım)
     mock-parser.ts            # deterministik mock parse
-    claude-parser.ts          # ⭐ gerçek Claude Vision (claude-opus-5, strict tool call)
-    parser.ts                 # mock/claude dağıtıcısı (PARSE_PROVIDER)
+    claude-parser.ts          # gerçek Claude Vision (Sonnet 5 default, strict tool call)
+    parser.ts                 # mock/claude dağıtıcısı (PARSE_PROVIDER) — Claude hatasında throw (sessiz fallback yok)
     push.ts                   # web-push (VAPID) sunucu tarafı
+    storage.ts                # S3/R2 adaptör (env-gated, yoksa local disk fallback)
     dashboard-data.ts         # dashboard veri toplayıcı + TDEE hesaplar
     widgets.ts                # widget kaydı & varsayılan yerleşim
     meals.ts  utils.ts
 prisma/schema.prisma          # User, LabResult, LabBiomarker, Biometric, Meal, DailyLog,
                               # FileAsset, DeviceConnection, Consent, FoodItem,
                               # MetabolismEstimate, DashboardLayout, Settings, PushSubscription
+prisma/migrations/0_init/     # Postgres init migration (14 tablo)
 prisma/seed.ts                # Emre + 28 gün geçmiş + lab + öğünler + Mi Scale ölçümleri (+bcrypt şifre)
+scripts/set-db-provider.mjs   # DATABASE_URL'den provider otomatik ayar
+.github/workflows/ci.yml      # typecheck + lint + build + Postgres migrate smoke
+sentry.*.config.ts            # server/edge/client Sentry (DSN yoksa inert)
+instrumentation.ts            # Next.js instrumentation hook
+vercel.json                   # build: db:provider + migrate deploy + next build; region fra1
+docker-compose.yml            # yerel Postgres 16 test
 public/ manifest.webmanifest sw.js offline.html icons/
-README.md                     # kurulum + go-live + KVKK
 ```
 
 ---
 
-## 7. Neler tamam (Faz 0–3) — doğrulama durumu
+## 7. Neler tamam (Faz 0–4A) — doğrulama durumu
 
 - **Faz 0 Tasarım** ✅ — sistem mimarisi, ERD, API, Dynamic TDEE, UI (artifact yayında).
 - **Faz 1 İskele + yerel ortam** ✅ — monorepo, Prisma/SQLite, seed.
-- **Faz 2 POC** ✅ (tarayıcıda doğrulandı): dashboard, Mi Scale simülasyon akışı (ölçüm→kompozisyon→kayıt),
-  TDEE motoru (curl: observed 2591 × w0.86 + prior 2740 → 2612), beslenme, metabolizma, profil, ayarlar,
-  dark mode (DOM ile teyit). `next build` hatasız.
-- **Faz 3** ✅ (built + verified 2026-08-12):
-  - **Auth.js** (Credentials+JWT, middleware, login/register, bcrypt): tarayıcıda uçtan uca test —
-    `/`→307→`/login`, demo giriş→dashboard (isim+avatar+çıkış).
-  - **Gerçek Claude Vision parse**: `PARSE_PROVIDER=claude` + `ANTHROPIC_API_KEY` ile `claude-opus-5`
-    strict tool call; yoksa mock'a düşer. Dağıtıcı + mock yolu test edildi (canlı Claude anahtar bekliyor).
-  - **PWA + web push**: SW aktif (offline + manifest + installable), VAPID + subscribe/test endpoint'leri,
-    Ayarlar'da push kontrolleri. JS ile teyit: swActive:true, manifest/sw/offline=200.
-    (Bildirim izni sandbox tarayıcıda `denied` — gerçek Chrome/Edge'de tam çalışır.)
+- **Faz 2 POC** ✅ (tarayıcıda doğrulandı): dashboard, Mi Scale simülasyon, TDEE motoru, beslenme, metabolizma, profil, ayarlar, dark mode. Build hatasız.
+- **Faz 3** ✅: Auth.js (Credentials+JWT, middleware, login/register, bcrypt), gerçek Claude Vision parse (strict tool call, mock fallback), PWA + web push (VAPID).
+- **Faz 4A (kod)** ✅: auto datasource switch, Postgres migration, CI/CD, Sentry (inert), S3/R2 storage, /api/health, güvenlik başlıkları, vercel.json.
+- **UI polish** ✅: chart integer-axis fix, Upload flow Claude-ready (provider badge, hata/validation states, sessiz mock fallback kaldırıldı).
+- **Cost optimization** ✅: Claude Sonnet 5 varsayılan parse model, thinking disabled, env-driven model seçimi.
+- **GitHub** ✅: Private repo `github.com/elighter/metacoach`, PR #1 merged, master yeşil.
 
-**Build:** 24 route + middleware, tip hatası yok.
-
-- **Faz 4 A grubu** ✅ (built + verified 2026-08-12, branch `faz4-go-live`):
-  - **Postgres geçişi otomatik:** `scripts/set-db-provider.mjs` `DATABASE_URL`'e göre datasource'u sqlite↔postgresql ayarlar (elle şema düzenleme yok). Commit'li Postgres init migration (`prisma/migrations/0_init`, 14 tablo) + `npm run db:migrate`/`db:deploy` + `docker-compose.yml`.
-  - **CI/CD:** `.github/workflows/ci.yml` — typecheck + lint + build + Postgres migrasyon smoke testi.
-  - **Sentry:** server/edge/client config + `instrumentation.ts` + `global-error.tsx`; `SENTRY_DSN` yoksa tamamen inert (@sentry/nextjs v8).
-  - **Object storage:** `src/lib/storage.ts` (R2/S3, env-gated; yoksa `./storage` yerel disk) → `ingest` route byte'ları saklar.
-  - **Health + sertleştirme:** `/api/health` (DB ping, auth'suz — `auth.config` PUBLIC_PREFIXES'e eklendi), güvenlik başlıkları (CSP/HSTS/X-Frame/nosniff/Referrer/Permissions) `next.config.mjs`, `vercel.json` (build'de migrate deploy). Canlı doğrulandı: health 200, header'lar var, login/redirect sağlam. Build 25 route yeşil.
-  - **Repo git'e alındı** (baseline + faz4 commit'leri). Push edilmedi (remote yok).
+**Build:** 25 route + middleware, tip hatası yok, CI yeşil.
 
 ---
 
 ## 8. Ortam değişkenleri (.env)
 
 `.env` yerelde dolu (dev değerleriyle). Şablon: `.env.example`.
-- `DATABASE_URL="file:./dev.db"` (prod: Postgres URL)
+- `DATABASE_URL="file:./dev.db"` (prod: Neon Postgres URL)
 - `AUTH_SECRET` (dev değeri var; prod: `openssl rand -base64 33`), `AUTH_TRUST_HOST="true"`
 - `PARSE_PROVIDER="mock"` → gerçek için `"claude"` + `ANTHROPIC_API_KEY` ekle
+- `CLAUDE_PARSE_MODEL="claude-sonnet-5"` (varsayılan, override edilebilir)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (dev anahtarları üretildi)
 - `TDEE_WINDOW_DAYS="21"`
+- Opsiyonel (prod): `R2_*`/`S3_*` (object storage), `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`
 
 ---
 
 ## 9. Önemli kararlar & tuzaklar (gotchas)
 
-- **SQLite kısıtları:** enum yok → `String`; array/JSON yok → JSON string; Decimal yerine `Float`. Prod'da yükseltilebilir.
-- **Apple Health web'de cloud API'sı yok** → prod'da Terra/Vital agregatörü (tasarım kararı). POC'de Mi Scale doğrudan.
+- **SQLite kısıtları:** enum yok → `String`; array/JSON yok → JSON string; Decimal yerine `Float`.
+- **Apple Health web'de cloud API'sı yok** → prod'da Terra/Vital agregatörü.
 - **Auth döngüsü:** `db.ts.getCurrentUser` içinde `auth`'u **dinamik import** eder (db↔auth circular'ı kırmak için).
-- **Middleware** edge'de çalışır → `auth.config.ts` prisma/bcrypt import ETMEZ; gerçek doğrulama `auth.ts`'te (node).
-- **Recharts** ilk mount'ta animasyon yüzünden ekran görüntüsünde boş görünebilir — gerçekte doğru render eder.
-- **zodOutputFormat** (Anthropic SDK) Zod v4 bekliyor; biz Zod v3 kullanıyoruz → parse için **strict tool call** yaklaşımı tercih edildi.
-- **Tarayıcı paneli** ekran görüntüsü bazen tema değişimini bir kare geç yansıtıyor; DOM computed style kesin kanıt.
-- Prisma 6.2 stabil; 7'ye yükseltme uyarısı var, dokunulmadı.
+- **Middleware** edge'de çalışır → `auth.config.ts` prisma/bcrypt import ETMEZ.
+- **zodOutputFormat** Zod v4 bekliyor; biz Zod v3 → **strict tool call** yaklaşımı.
+- Prisma 6.2 stabil; 7'ye dokunulmadı.
+- **Vercel dosya sistemi geçici** — R2/S3 olmadan upload byte'ları saklanmaz (parse sonuçları kaydedilir, orijinal dosya kaybolur). R2 free tier (10GB) sonradan eklenebilir.
+- **Claude parse hatası:** `ParseError` fırlatır (sessiz mock fallback yok) — veri bütünlüğü için kasıtlı.
 
 ---
 
-## 10. Sıradaki adımlar (kullanıcıya sunulan seçenekler)
+## 10. Mevcut durum: Deploy aşaması
 
-Faz 4 A grubu (kod) tamam. Sıradaki seçenekler:
-- **(b1) Faz 4 B grubu — hesap/deploy adımları:** Neon/Supabase Postgres + Vercel projesi + domain + secret'lar
-  (prod `AUTH_SECRET`/VAPID, R2 anahtarları, Sentry DSN) girip **canlıya alma**. Ben adım adım rehber + komut veririm, sen uygularsın.
-- **(a) Wearable senkron** — Terra/Vital ile Apple Health + Garmin (adım/nabız/aktif kalori). (Faz 3'te ertelendi.)
-- **(c) Gerçek Claude parse'ı canlı deneme** — kullanıcının `ANTHROPIC_API_KEY`'i ile `PARSE_PROVIDER=claude`.
-- **(d) UI/akış ince ayarı** — dashboard kartları, marka rengi (şu an jade-teal + amber), ek ekranlar.
-- **Faz 4 kalanları (hukuki/operasyonel, kullanıcı katılımı):** KVKK/GDPR (aydınlatma metni, VERBİS, denetim logu,
-  rıza sürümleme, veri dışa aktarım/silme), pentest, CSP'yi nonce'a sıkılaştırma, OAuth/e-posta doğrulama + şifre sıfırlama.
+### Alınan kararlar (2026-08-15)
+
+| Servis | Seçim | Neden |
+|---|---|---|
+| **Neon** | **Free ($0)** | 0.5GB + 100 CU-hr/ay. Tek kullanıcı sağlık verisi için fazlasıyla yeter. Cold start ~1sn (kişisel kullanımda sorun değil). |
+| **Vercel** | **Hobby (free)** | Kişisel proje. Next.js sıfır-config deploy. Ticari olursa Pro ($20/ay). |
+| **Anthropic API** | Kullandıkça öde | Sonnet 5, parse başına birkaç sent. |
+| **Domain** | **Vercel subdomain** (`.vercel.app`) başlangıçta | HTTPS dahil, $0. Custom domain isterse Cloudflare/Namecheap ~$10/yıl. |
+| **R2 / Sentry** | Sonra | Bloklayıcı değil. R2 olmadan parse çalışır (orijinal dosya saklanmaz). |
+
+**Toplam altyapı maliyeti: $0/ay** + Claude API parse başına ~birkaç sent.
+
+### Deploy runbook (sıradaki adımlar)
+
+1. **Neon:** Free proje oluştur → `DATABASE_URL` (direct connection string) al.
+2. **Vercel:** GitHub repo'yu import et (`github.com/elighter/metacoach`).
+3. **Vercel env vars** ekle:
+   - `DATABASE_URL` (Neon'dan)
+   - `AUTH_SECRET` (prod: `openssl rand -base64 33`)
+   - `AUTH_TRUST_HOST=true`
+   - `PARSE_PROVIDER=mock` (başlangıçta)
+   - `NEXT_PUBLIC_APP_NAME=MetaCoach`
+   - `APP_BASE_URL` (Vercel URL'i belli olduktan sonra)
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT` (prod anahtarları)
+   - İsteğe bağlı: `ANTHROPIC_API_KEY` + `PARSE_PROVIDER=claude` + `CLAUDE_PARSE_MODEL`
+4. **Deploy tetikle** → Vercel otomatik: `db:provider` → `prisma migrate deploy` → `next build`.
+5. **Doğrulama:**
+   - `curl https://<app>.vercel.app/api/health` → 200 + DB bağlantısı
+   - Login (demo credentials), dashboard, upload akışı test
+   - Güvenlik başlıklarını kontrol (`curl -I`)
+
+### Prod secrets (önceki oturumda üretildi, chat'te verildi)
+- `AUTH_SECRET`: kullanıcı kaydetti
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: kullanıcı kaydetti
 
 ---
 
-## 11. Hafıza (persistent memory)
+## 11. Sıradaki (deploy sonrası)
+
+- **Canlı doğrulama** — health, login, dashboard, Claude Vision parse test
+- **Custom domain** opsiyonel — Cloudflare/Namecheap ~$10/yıl
+- **R2 object storage** — orijinal dosyaların saklanması (Cloudflare R2 free tier 10GB)
+- **Sentry** — error monitoring (free tier)
+- **Wearable senkron** — Terra/Vital (Apple Health + Garmin)
+- **OAuth/email verify** + şifre sıfırlama
+- **KVKK/GDPR** — aydınlatma metni, VERBİS, denetim logu, rıza, veri dışa aktarım/silme
+- **Pentest + CSP nonce**
+
+---
+
+## 12. Hafıza (persistent memory)
 
 Şurada tutuluyor: `~/.claude/projects/-Users-emrecakmak-Projects-MetaCoach/memory/`
-- `metacoach-project.md` — hedefler, kilitli kararlar, faz durumu (Faz 3 done olarak güncel).
+- `metacoach-project.md` — hedefler, kilitli kararlar, faz durumu.
 - `emre-workflow.md` — Türkçe, teknik, onay-kapılı çalışma tarzı.
 - `MEMORY.md` — index.
