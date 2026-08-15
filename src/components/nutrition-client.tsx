@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Trash2, Loader2, Utensils } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, Utensils, Camera, CheckCircle2, X, Sparkles } from "lucide-react";
 import { fmt } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+
+interface ParsedItem {
+  name: string;
+  portionG: number;
+  kcal: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  confidence: number;
+  selected: boolean;
+}
 
 interface Meal {
   id: string; mealType: string; name: string;
@@ -40,6 +51,79 @@ export function NutritionClient({ initialMeals }: { initialMeals: Meal[] }) {
   const [selected, setSelected] = useState<Food | null>(null);
   const [grams, setGrams] = useState(100);
   const [busy, setBusy] = useState(false);
+
+  // Photo parse state
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoParsing, setPhotoParsing] = useState(false);
+  const [photoItems, setPhotoItems] = useState<ParsedItem[]>([]);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoProvider, setPhotoProvider] = useState<string | null>(null);
+  const [photoSaving, setPhotoSaving] = useState(false);
+
+  async function handlePhoto(file: File) {
+    setPhotoError(null);
+    setPhotoItems([]);
+    setPhotoProvider(null);
+    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoParsing(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/meals/parse", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Parse hatası");
+      setPhotoProvider(data.provider);
+      setPhotoItems(
+        (data.items || []).map((it: ParsedItem) => ({ ...it, selected: true })),
+      );
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Beklenmeyen hata");
+    } finally {
+      setPhotoParsing(false);
+    }
+  }
+
+  async function savePhotoItems() {
+    const toSave = photoItems.filter((it) => it.selected);
+    if (toSave.length === 0) return;
+    setPhotoSaving(true);
+    for (const it of toSave) {
+      const res = await fetch("/api/meals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mealType,
+          name: `${it.name} (~${it.portionG} g)`,
+          totalKcal: it.kcal,
+          proteinG: it.proteinG,
+          carbG: it.carbG,
+          fatG: it.fatG,
+          source: "photo",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMeals((m) => [
+          ...m,
+          { id: data.meal.id, mealType, name: `${it.name} (~${it.portionG} g)`, totalKcal: it.kcal, proteinG: it.proteinG, carbG: it.carbG, fatG: it.fatG, timeLabel: "şimdi" },
+        ]);
+      }
+    }
+    setPhotoSaving(false);
+    setPhotoItems([]);
+    setPhotoPreview(null);
+    setPhotoProvider(null);
+    router.refresh();
+  }
+
+  function resetPhoto() {
+    setPhotoPreview(null);
+    setPhotoItems([]);
+    setPhotoError(null);
+    setPhotoProvider(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -151,6 +235,110 @@ export function NutritionClient({ initialMeals }: { initialMeals: Meal[] }) {
           ))}
         </div>
 
+        {/* Photo upload */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handlePhoto(f);
+          }}
+        />
+
+        {!photoPreview && photoItems.length === 0 && (
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-strong bg-surface-2 px-3 py-4 text-sm font-medium text-ink-2 transition-colors hover:border-primary hover:text-primary-ink"
+          >
+            <Camera className="h-5 w-5" />
+            Tabak fotoğrafı çek / yükle
+          </button>
+        )}
+
+        {photoPreview && (
+          <div className="mt-2 space-y-3">
+            <div className="relative">
+              <img src={photoPreview} alt="Tabak" className="w-full rounded-xl object-cover" style={{ maxHeight: 200 }} />
+              <button
+                onClick={resetPhoto}
+                className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                aria-label="Kaldır"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              {photoProvider && (
+                <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-xs font-medium text-white">
+                  <Sparkles className="h-3 w-3" />
+                  {photoProvider === "claude" ? "Claude Vision" : "Mock"}
+                </span>
+              )}
+            </div>
+
+            {photoParsing && (
+              <div className="flex items-center justify-center gap-2 py-4 text-sm text-ink-3">
+                <Loader2 className="h-4 w-4 animate-spin" /> AI yiyecekleri tanıyor…
+              </div>
+            )}
+
+            {photoError && (
+              <div className="rounded-xl border border-crit/30 bg-crit-wash px-3 py-2 text-sm text-crit">
+                {photoError}
+              </div>
+            )}
+
+            {photoItems.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-ink-3">Tanınan yiyecekler — eklemek istemediklerini kaldır:</div>
+                {photoItems.map((it, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl border p-2.5 transition-colors",
+                      it.selected ? "border-primary/40 bg-primary-wash/40" : "border-border bg-surface-2 opacity-50",
+                    )}
+                  >
+                    <button
+                      onClick={() => setPhotoItems((prev) => prev.map((p, j) => j === i ? { ...p, selected: !p.selected } : p))}
+                      className={cn("grid h-6 w-6 shrink-0 place-items-center rounded-md", it.selected ? "bg-primary text-white" : "bg-surface-2 text-ink-3")}
+                    >
+                      {it.selected ? <CheckCircle2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{it.name}</div>
+                      <div className="font-mono text-[0.65rem] text-ink-3">
+                        ~{it.portionG}g · {fmt(it.kcal)} kcal · P{fmt(it.proteinG)} K{fmt(it.carbG)} Y{fmt(it.fatG)}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-xs text-ink-3">%{Math.round(it.confidence * 100)}</span>
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-1">
+                  <button className="btn flex-1" onClick={resetPhoto}>Vazgeç</button>
+                  <button
+                    className="btn btn-primary flex-1"
+                    onClick={savePhotoItems}
+                    disabled={photoSaving || photoItems.filter((it) => it.selected).length === 0}
+                  >
+                    {photoSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    {photoItems.filter((it) => it.selected).length} öğe ekle
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 text-xs text-ink-3">
+          <div className="h-px flex-1 bg-border" />
+          veya manuel ara
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        {/* Manual search */}
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-ink-3" />
           <input value={q} onChange={(e) => { setQ(e.target.value); setSelected(null); }} placeholder="Besin ara (ör. yulaf, tavuk)…" className="input pl-9" />
@@ -164,7 +352,7 @@ export function NutritionClient({ initialMeals }: { initialMeals: Meal[] }) {
                 <span className="ml-2 shrink-0 font-mono text-xs text-ink-3">{fmt(f.kcalPer100g)} kcal/100g</span>
               </button>
             ))}
-            {foods.length === 0 && <p className="px-2 py-3 text-sm text-ink-3">Sonuç yok.</p>}
+            {foods.length === 0 && q.length > 0 && <p className="px-2 py-3 text-sm text-ink-3">Sonuç yok.</p>}
           </div>
         )}
 

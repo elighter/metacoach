@@ -102,6 +102,81 @@ export async function parseLabWithClaude(dataBase64: string): Promise<ParsedLab>
   return tu.input as ParsedLab;
 }
 
+// ── Meal photo parse ──
+
+export interface ParsedMealItem {
+  name: string;
+  portionG: number;
+  kcal: number;
+  proteinG: number;
+  carbG: number;
+  fatG: number;
+  confidence: number;
+}
+
+export interface ParsedMeal {
+  confidence: number;
+  items: ParsedMealItem[];
+}
+
+const mealSchema = {
+  type: "object" as const,
+  additionalProperties: false,
+  properties: {
+    confidence: { type: "number", description: "Genel güven 0-1" },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string", description: "Yiyecek adı (Türkçe)" },
+          portionG: { type: "number", description: "Tahmini porsiyon gram" },
+          kcal: { type: "number", description: "Tahmini kalori" },
+          proteinG: { type: "number", description: "Protein gram" },
+          carbG: { type: "number", description: "Karbonhidrat gram" },
+          fatG: { type: "number", description: "Yağ gram" },
+          confidence: { type: "number", description: "Bu öğe için güven 0-1" },
+        },
+        required: ["name", "portionG", "kcal", "proteinG", "carbG", "fatG", "confidence"],
+      },
+    },
+  },
+  required: ["confidence", "items"],
+};
+
+const MEAL_PROMPT = `Bu bir yemek/tabak fotoğrafıdır. Görseldeki tüm yiyecekleri ayrı ayrı tanı.
+Her biri için Türkçe ad, tahmini porsiyon (gram), kalori ve makro besinleri (protein, karbonhidrat, yağ) hesapla.
+Emin olmadığın öğeler için düşük confidence ver. record_meal aracını çağır.`;
+
+export async function parseMealWithClaude(
+  dataBase64: string,
+  mime: string,
+): Promise<ParsedMeal> {
+  const mediaType = (["image/png", "image/jpeg", "image/gif", "image/webp"].includes(mime)
+    ? mime
+    : "image/jpeg") as "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  const res = await anthropic().messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    thinking: { type: "disabled" },
+    tools: [{ name: "record_meal", description: "Tanınan yiyecekleri kaydet", input_schema: mealSchema, strict: true } as Anthropic.Tool],
+    tool_choice: { type: "tool", name: "record_meal" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: dataBase64 } },
+          { type: "text", text: MEAL_PROMPT },
+        ],
+      },
+    ],
+  });
+  const tu = res.content.find((b) => b.type === "tool_use");
+  if (!tu || tu.type !== "tool_use") throw new Error("Claude çıkarımı boş döndü.");
+  return tu.input as ParsedMeal;
+}
+
 export async function parseInbodyWithClaude(
   dataBase64: string,
   mime: string,
