@@ -12,7 +12,8 @@ Kan tahlili PDF'i ve InBody/akıllı tartı görsellerini **AI ile okur**, giyil
 kilo/yağ değişiminden **gerçek metabolizma hızını (Dynamic TDEE) öğrenir**. Apple-kalitesinde,
 kart tabanlı, dark/light, **kullanıcının özelleştirebildiği** dashboard.
 
-**Konum:** `/Users/emrecakmak/Projects/MetaCoach` · **GitHub:** private repo `github.com/elighter/metacoach` — **her şey `master`'da** (PR #1 merge edildi; Faz 0-4 + cila). CI yeşil (typecheck/lint/build + Postgres migrate + GitGuardian). Makine kapalıyken **Claude Code web** (claude.ai/code) ile devam edilebilir.
+**Konum:** `/Users/emrecakmak/Projects/MetaCoach` · **GitHub:** private repo `github.com/elighter/metacoach` — **her şey `master`'da**. CI yeşil (typecheck/lint/build + Postgres migrate + GitGuardian). Makine kapalıyken **Claude Code web** (claude.ai/code) ile devam edilebilir.
+**Prod URL:** `https://metacoach-three.vercel.app` · **Neon:** Frankfurt (eu-central-1)
 > Not: Bu makinede `gh` kimliği macOS keyring'de — Bash aracı git/gh komutlarını **sandbox kapalı** çalıştırmalı, yoksa auth görünmez.
 **Görsel tasarım dokümanı (artifact):** https://claude.ai/code/artifact/0ea09d80-710a-4d0d-94f1-f81156dc8f4d
 
@@ -47,7 +48,7 @@ Recharts + **Prisma/SQLite**. Üretimde Postgres (Neon).
 
 Auto datasource switching: `scripts/set-db-provider.mjs` `DATABASE_URL`'e göre provider'ı sqlite↔postgresql yapar (elle şema düzenleme yok).
 
-Ana bağımlılıklar: next 15.1.6, react 18.3.1, prisma 6.2.1, recharts 2.15, @dnd-kit, lucide-react,
+Ana bağımlılıklar: next 15.5.23, react 18.3.1, prisma 6.2.1, recharts 2.15, @dnd-kit, lucide-react,
 next-auth ^5.0.0-beta.25, bcryptjs, web-push, @anthropic-ai/sdk ^0.116, zod ^3.25.76, @sentry/nextjs v8.
 
 ---
@@ -87,7 +88,7 @@ src/
       register/               # kayıt
       ingest/ ingest/confirm/ # parse + onaylı kaydet
       mi-scale/reading/       # tartı ölçümü → kompozisyon
-      foods/ meals/ meals/[id]/
+      foods/ meals/ meals/[id]/ meals/parse/
       metabolism/recompute/
       profile/ settings/
       dashboard/layout/       # widget yerleşimi kaydet
@@ -100,14 +101,17 @@ src/
     dashboard/widgets.tsx     # tüm widget render'ları
     charts.tsx                # Recharts: WeightEnergyChart, TdeeHistoryChart, Ring, Sparkline
     mi-scale-panel.tsx        # Web Bluetooth + simülatör
-    nutrition-client.tsx  profile-form.tsx  settings-form.tsx
+    onboarding.tsx            # 5 adımlı wizard (localStorage ile ilk giriş takibi)
+    help-fab.tsx              # sağ alt köşe floating yardım butonu + accordion panel
+    nutrition-client.tsx      # öğün listesi + fotoğraf AI parse + manuel arama
+    profile-form.tsx  settings-form.tsx
     push-controls.tsx  pwa-register.tsx  recompute-button.tsx
   lib/
     db.ts                     # Prisma singleton + getCurrentUser (session'dan; auth'u dinamik import)
     tdee.ts                   # Dynamic TDEE motoru (EWMA + enerji dengesi + Katch-McArdle)
     mi-scale.ts               # BLE çözücü + Xiaomi kompozisyon matematiği (yaklaşım)
     mock-parser.ts            # deterministik mock parse
-    claude-parser.ts          # gerçek Claude Vision (Sonnet 5 default, strict tool call)
+    claude-parser.ts          # gerçek Claude Vision (Sonnet 5 default, strict tool call) — lab, inbody, meal photo
     parser.ts                 # mock/claude dağıtıcısı (PARSE_PROVIDER) — Claude hatasında throw (sessiz fallback yok)
     push.ts                   # web-push (VAPID) sunucu tarafı
     storage.ts                # S3/R2 adaptör (env-gated, yoksa local disk fallback)
@@ -130,7 +134,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 
 ---
 
-## 7. Neler tamam (Faz 0–4A) — doğrulama durumu
+## 7. Neler tamam (Faz 0–4B) — doğrulama durumu
 
 - **Faz 0 Tasarım** ✅ — sistem mimarisi, ERD, API, Dynamic TDEE, UI (artifact yayında).
 - **Faz 1 İskele + yerel ortam** ✅ — monorepo, Prisma/SQLite, seed.
@@ -145,7 +149,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Help FAB** ✅: Sağ alt köşe floating button, accordion yardım paneli, tanıtım turu tekrar açma.
 - **AI meal photo parse** ✅: Tabak fotoğrafı → Claude Vision → yiyecek tanıma + kalori/makro hesaplama, onay sonrası kayıt. Mock fallback mevcut.
 
-**Build:** 26 route + middleware, tip hatası yok, CI yeşil. **Prod:** `metacoach-git-master-elighters-projects.vercel.app`
+**Build:** 26 route + middleware, tip hatası yok, CI yeşil. **Prod:** `metacoach-three.vercel.app`
 
 ---
 
@@ -154,10 +158,11 @@ public/ manifest.webmanifest sw.js offline.html icons/
 `.env` yerelde dolu (dev değerleriyle). Şablon: `.env.example`.
 - `DATABASE_URL="file:./dev.db"` (prod: Neon Postgres URL)
 - `AUTH_SECRET` (dev değeri var; prod: `openssl rand -base64 33`), `AUTH_TRUST_HOST="true"`
-- `PARSE_PROVIDER="mock"` → gerçek için `"claude"` + `ANTHROPIC_API_KEY` ekle
+- `PARSE_PROVIDER="claude"` (prod'da aktif) + `ANTHROPIC_API_KEY` (yerelde `"mock"`)
 - `CLAUDE_PARSE_MODEL="claude-sonnet-5"` (varsayılan, override edilebilir)
-- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (dev anahtarları üretildi)
-- `TDEE_WINDOW_DAYS="21"`
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (prod anahtarları Vercel'de)
+- `TDEE_WINDOW_DAYS="21"` · `NEXT_PUBLIC_APP_NAME="MetaCoach"`
+- `APP_BASE_URL` (prod: `https://metacoach-three.vercel.app`)
 - Opsiyonel (prod): `R2_*`/`S3_*` (object storage), `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`
 
 ---
@@ -189,37 +194,31 @@ public/ manifest.webmanifest sw.js offline.html icons/
 
 **Toplam altyapı maliyeti: $0/ay** + Claude API parse başına ~birkaç sent.
 
-### Deploy runbook (sıradaki adımlar)
+### Deploy durumu (tamamlandı 2026-08-15)
 
-1. **Neon:** Free proje oluştur → `DATABASE_URL` (direct connection string) al.
-2. **Vercel:** GitHub repo'yu import et (`github.com/elighter/metacoach`).
-3. **Vercel env vars** ekle:
-   - `DATABASE_URL` (Neon'dan)
-   - `AUTH_SECRET` (prod: `openssl rand -base64 33`)
-   - `AUTH_TRUST_HOST=true`
-   - `PARSE_PROVIDER=mock` (başlangıçta)
-   - `NEXT_PUBLIC_APP_NAME=MetaCoach`
-   - `APP_BASE_URL` (Vercel URL'i belli olduktan sonra)
-   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT` (prod anahtarları)
-   - İsteğe bağlı: `ANTHROPIC_API_KEY` + `PARSE_PROVIDER=claude` + `CLAUDE_PARSE_MODEL`
-4. **Deploy tetikle** → Vercel otomatik: `db:provider` → `prisma migrate deploy` → `next build`.
-5. **Doğrulama:**
-   - `curl https://<app>.vercel.app/api/health` → 200 + DB bağlantısı
-   - Login (demo credentials), dashboard, upload akışı test
-   - Güvenlik başlıklarını kontrol (`curl -I`)
+- **Neon:** `ep-ancient-frog-b2q1sk3n.c-6.eu-central-1.aws.neon.tech/neondb` (Frankfurt, Free)
+- **Vercel:** `metacoach-three.vercel.app` (Hobby, auto-deploy on push to master)
+- **Deployment Protection:** kapalı (prod public, auth kendi login ekranımızda)
+- **CI/CD:** `git push origin master` → Vercel otomatik build (`db:provider` → `prisma migrate deploy` → `next build`)
+- **Env vars:** 12 adet Vercel'de (DATABASE_URL, AUTH_SECRET, AUTH_TRUST_HOST, PARSE_PROVIDER=claude, ANTHROPIC_API_KEY, CLAUDE_PARSE_MODEL, NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, TDEE_WINDOW_DAYS, NEXT_PUBLIC_APP_NAME, APP_BASE_URL)
 
-### Prod secrets (önceki oturumda üretildi, chat'te verildi)
-- `AUTH_SECRET`: kullanıcı kaydetti
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: kullanıcı kaydetti
+### Doğrulanmış (prod'da)
+- `/api/health` → 200, DB up, latency 3ms ✅
+- Login + dashboard + seed verisi ✅
+- Claude Vision parse (kan tahlili PDF + InBody görsel) ✅
+- Onboarding wizard + Help FAB ✅
+- AI meal photo parse (Beslenme sayfası) ✅
+- Güvenlik başlıkları (CSP, HSTS, X-Frame-Options) ✅
+- Next.js 15.5.23 (CVE-2025-66478 fix) ✅
 
 ---
 
-## 11. Sıradaki (deploy sonrası)
+## 11. Sıradaki
 
-- **Canlı doğrulama** — health, login, dashboard, Claude Vision parse test
 - **Custom domain** opsiyonel — Cloudflare/Namecheap ~$10/yıl
 - **R2 object storage** — orijinal dosyaların saklanması (Cloudflare R2 free tier 10GB)
 - **Sentry** — error monitoring (free tier)
+- **Yiyecek veritabanı** — prod'da FoodItem tablosu boş, seed veya toplu import gerekli (manuel arama için)
 - **Wearable senkron** — Terra/Vital (Apple Health + Garmin)
 - **OAuth/email verify** + şifre sıfırlama
 - **KVKK/GDPR** — aydınlatma metni, VERBİS, denetim logu, rıza, veri dışa aktarım/silme
