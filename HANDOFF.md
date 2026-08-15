@@ -1,7 +1,7 @@
 # MetaCoach — Oturum Devir Dokümanı (Handoff)
 
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
-> Tarih: 2026-08-15 · Durum: **Faz 0–4A tamamlandı, master'da, CI yeşil.** Deploy aşamasında — servis seçimleri yapıldı, Neon + Vercel kurulumu bekliyor.
+> Tarih: 2026-08-15 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse eklendi.
 
 ---
 
@@ -140,8 +140,12 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **UI polish** ✅: chart integer-axis fix, Upload flow Claude-ready (provider badge, hata/validation states, sessiz mock fallback kaldırıldı).
 - **Cost optimization** ✅: Claude Sonnet 5 varsayılan parse model, thinking disabled, env-driven model seçimi.
 - **GitHub** ✅: Private repo `github.com/elighter/metacoach`, PR #1 merged, master yeşil.
+- **Faz 4B (deploy)** ✅: Neon Free (Frankfurt) + Vercel Hobby, migration deploy, health endpoint doğrulandı.
+- **Onboarding** ✅: 5 adımlı wizard (ilk girişte otomatik, localStorage ile takip, Help'ten tekrar erişim).
+- **Help FAB** ✅: Sağ alt köşe floating button, accordion yardım paneli, tanıtım turu tekrar açma.
+- **AI meal photo parse** ✅: Tabak fotoğrafı → Claude Vision → yiyecek tanıma + kalori/makro hesaplama, onay sonrası kayıt. Mock fallback mevcut.
 
-**Build:** 25 route + middleware, tip hatası yok, CI yeşil.
+**Build:** 26 route + middleware, tip hatası yok, CI yeşil. **Prod:** `metacoach-git-master-elighters-projects.vercel.app`
 
 ---
 
@@ -171,7 +175,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 
 ---
 
-## 10. Mevcut durum: Deploy aşaması
+## 10. Mevcut durum: Canlı (deploy tamamlandı)
 
 ### Alınan kararlar (2026-08-15)
 
