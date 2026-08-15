@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
+import { OnboardingWizard, useOnboarding } from "@/components/onboarding";
+import { HelpFab } from "@/components/help-fab";
 
 function initialOf(name: string) {
   return (name.trim()[0] ?? "?").toUpperCase();
@@ -114,6 +116,7 @@ export function AppShell({
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const onboarding = useOnboarding();
 
   // Auth screens render without the app chrome.
   if (pathname.startsWith("/login") || pathname.startsWith("/register")) {
@@ -180,6 +183,9 @@ export function AppShell({
         </header>
         <main className="mx-auto max-w-6xl px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
+
+      <OnboardingWizard open={onboarding.show} onClose={onboarding.dismiss} />
+      <HelpFab onReopenOnboarding={onboarding.reopen} />
     </div>
   );
 }
