@@ -1,7 +1,7 @@
 # MetaCoach — Oturum Devir Dokümanı (Handoff)
 
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
-> Tarih: 2026-08-25 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse, Antrenman modülü eklendi. **Son:** Ön Değerlendirme modülü (`/assessment`) + öğün fotoğrafı galeriden yükleme fix'i — PR #2 master'a merge edildi (Vercel prod deploy tetiklendi; kullanıcı prod doğrulaması bekliyor).
+> Tarih: 2026-08-25 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse, Antrenman modülü, Ön Değerlendirme (`/assessment`) + galeri fix'i (PR #2/#3 master'da). **Son (branch'te, merge bekliyor):** Wearable aktivite otomasyonu — Apple Health/Technogym → webhook (`/api/ingest/health`) → DailyLog/WorkoutSession + otomatik activityBase kalibrasyonu. Manuel antrenman girişini ortadan kaldırır.
 
 ---
 
@@ -95,6 +95,8 @@ src/
       dashboard/layout/       # widget yerleşimi kaydet
       workouts/generate/ workouts/session/[id]/ workouts/set/[id]/  # antrenman
       assessment/             # ön değerlendirme upsert (POST, zod, taslak/gönder)
+      ingest/health/          # wearable webhook (Bearer token, session'sız)
+      settings/health-token/  # ingest token (yeniden) üret (session korumalı)
       push/subscribe/ push/test/   # web push
       health/                 # DB ping, auth'suz
   components/
@@ -124,6 +126,8 @@ src/
     widgets.ts                # widget kaydı & varsayılan yerleşim
     meals.ts  utils.ts
     assessment.ts               # ön değerlendirme: etiketler, hazırlık skoru, lab referans aralıkları (server+client paylaşır)
+    health-import.ts            # wearable adaptörü: HAE/generic JSON → normalize → DailyLog/WorkoutSession (oto-tamamlama+dedupe)
+    activity-calibration.ts     # aktif kalori/adım → activityBase kalibrasyonu (activityAuto ile)
     workout-library.ts          # 34 egzersizlik salon kütüphanesi (saf veri, faz etiketli) — seed+app paylaşır
     workout.ts                  # şablon program üretici + kcal tahmini + adaptif protein
     workout-ai.ts               # Claude program üretici (strict tool call) + aiConfigured()
@@ -131,10 +135,12 @@ src/
 prisma/schema.prisma          # User, LabResult, LabBiomarker, Biometric, Meal, DailyLog,
                               # FileAsset, DeviceConnection, Consent, FoodItem,
                               # MetabolismEstimate, DashboardLayout, Settings, PushSubscription,
-                              # Exercise, WorkoutProgram, WorkoutSession, WorkoutSet, CoachAssessment
+                              # Exercise, WorkoutProgram, WorkoutSession(+source), WorkoutSet,
+                              # CoachAssessment, HealthIngestToken; User(+activityAuto)
 prisma/migrations/0_init/     # Postgres init migration (14 tablo)
 prisma/migrations/20260825110158_add_workout_module/   # antrenman tabloları
 prisma/migrations/20260825120000_add_coach_assessment/ # CoachAssessment tablosu
+prisma/migrations/20260825130000_add_health_ingest/    # HealthIngestToken + activityAuto + WorkoutSession.source
 prisma/seed.ts                # Emre + 28 gün geçmiş + lab + öğünler + Mi Scale ölçümleri (+bcrypt şifre)
 scripts/set-db-provider.mjs   # DATABASE_URL'den provider otomatik ayar
 .github/workflows/ci.yml      # typecheck + lint + build + Postgres migrate smoke
@@ -161,6 +167,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Onboarding** ✅: 5 adımlı wizard (ilk girişte otomatik, localStorage ile takip, Help'ten tekrar erişim).
 - **Help FAB** ✅: Sağ alt köşe floating button, accordion yardım paneli, tanıtım turu tekrar açma.
 - **AI meal photo parse** ✅: Tabak fotoğrafı → Claude Vision → yiyecek tanıma + kalori/makro hesaplama, onay sonrası kayıt. Mock fallback mevcut.
+- **Wearable aktivite otomasyonu** 🔲 (2026-08-25, branch'te — build/lint/tsc temiz, **merge + prod doğrulaması bekliyor**): Manuel antrenman girişi TDEE'yi beslemiyordu (yüksek efor/sıfır fayda) → çözüm: aktiviteyi otomatik akıt. **Karar:** Apple Health tek toplama merkezi (Watch + Technogym oraya senkron), oradan push webhook. **Mimari:** `HealthIngestToken` (kullanıcı başına gizli token) → `POST /api/ingest/health` (Bearer token, session'sız, `PUBLIC_PREFIXES`'te) → `lib/health-import.ts` adaptörü (Health Auto Export JSON + generic/Kısayol biçimi, biçim-toleranslı) → `DailyLog.activeKcal/steps` upsert + `WorkoutSession(source="imported", completed)`; o güne planlı seans varsa onu oto-tamamlar (elle set işaretleme biter). `lib/activity-calibration.ts` son 28 günün aktif kalori/adımından `activityBase`'i otomatik türetir (`User.activityAuto` ile override edilebilir); **yakılan kalori TDEE'ye/hedefe EKLENMEZ** (çift sayma yok). Ayarlar'da "Apple Health & Aktivite" kartı: webhook URL + token + kurulum adımları + yenile. Adaptör fixture testi geçti (HAE + generic). **Not:** Apple tam export'u (`dışa aktarılan.xml`) 671 MB — webhook'a uygun değil; sadece nadir/yerel geçmiş dolgusu (henüz yok). Kullanıcının iOS tarafını (Health Auto Export app veya Kısayol) kurması gerekiyor; gerçek payload ile alan eşlemesi son kez teyit edilecek. `source` alanı `WorkoutSession`'a eklendi.
 - **Ön Değerlendirme modülü** ✅ (2026-08-25, PR #2 master'a merge — build/lint/typecheck temiz; **prod doğrulaması kullanıcıda**): Antrenör/diyetisyen görüşmesi öncesi 3-bölümlük intake — ① son 2-3 günlük yemek alışkanlıkları (serbest metin), ② kişisel rutin (uyanış/uyku saati + hareket seviyesi), ③ son kan tahlilleri varsa (B12, D vit, açlık insülini, HOMA-IR, TSH → referans aralığına göre düşük/normal/yüksek rozet). `/assessment` sayfası + hazırlık göstergeli form (taslak kaydet / görüşmeye gönder), `CoachAssessment` modeli (kullanıcı başına tek kayıt, upsert), `POST /api/assessment`, nav girişi, demo seed. **Not:** kendini-değerlendirme aracı; referans aralıkları bilgi amaçlı, tanı değil.
 - **Fix: öğün fotoğrafı galeriden yükleme** ✅ (2026-08-25, PR #2): `nutrition-client.tsx` tek `<input capture="environment">` kullanıyordu → mobil tarayıcıyı kameraya zorlayıp galeriyi engelliyordu. Kamera (capture'lı) + galeri (capture'sız) için ayrı input ve "Fotoğraf çek" / "Galeriden yükle" iki buton. (Masaüstünde zaten seçici açılıyordu; asıl etki mobilde.)
 - **Antrenman modülü** ✅ (2026-08-25, tarayıcıda doğrulandı): 4 fazlı periyodizasyon (hazırlık→ana yüklenme→kardiyo→soğuma), 3 gün A/B split (A=kuvvet, B=fonksiyonel). Claude ile kişiye özel program üretimi (strict tool call) + deterministik şablon fallback. 34 egzersizlik salon kütüphanesi. `/workout` sayfası (4 faz akordeonu, set işaretle/ağırlık logla, seansı tamamla), dashboard `nextWorkout` widget'ı, "Antrenman" nav. Adaptif antrenman-günü protein artışı. **Kritik karar:** tahmini yakılan kalori sadece gösterim — Dynamic TDEE'ye BESLENMEZ (çift sayım önlenir; TDEE zaten toplam harcamayı kilo/alım'dan öğreniyor). estKcal doğrulandı (519 kcal / 59 dk).

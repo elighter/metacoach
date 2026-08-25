@@ -20,6 +20,7 @@ model User {
   sex          String?   // male | female | other
   heightCm     Float?
   activityBase String    @default("moderate") // sedentary|light|moderate|active|athlete
+  activityAuto Boolean   @default(true)        // activityBase'i wearable aktivitesinden otomatik kalibre et
   goal         String    @default("maintain") // cut | maintain | bulk
   unitPref     String    @default("metric")   // metric | imperial
   locale       String    @default("tr")
@@ -42,6 +43,7 @@ model User {
   workoutPrograms     WorkoutProgram[]
   workoutSessions     WorkoutSession[]
   coachAssessment     CoachAssessment?
+  healthIngestToken   HealthIngestToken?
 }
 
 model FileAsset {
@@ -260,6 +262,7 @@ model WorkoutSession {
   dayType      String // strength | functional
   label        String // "A · Kuvvet" | "B · Fonksiyonel"
   status       String          @default("planned") // planned | in_progress | completed | skipped
+  source       String          @default("planned") // planned | imported (wearable/Apple Health)
   completedAt  DateTime?
   durationMin  Int?
   estKcal      Float?
@@ -313,4 +316,18 @@ model CoachAssessment {
   submittedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ── Wearable / aktivite ingest ─────────────────────────────────────────────
+// Session'sız cihaz push'ları (iOS "Health Auto Export" / Apple Kısayol) için
+// kullanıcı başına gizli token. Webhook Bearer token ile doğrular; UI'dan
+// yeniden üretilebilir. Token → kullanıcı, aktivite verisini DailyLog/
+// WorkoutSession'a yazar.
+model HealthIngestToken {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
 }

@@ -314,6 +314,14 @@ async function main() {
     },
   });
 
+  // ── Aktivite ingest token + Apple Health cihaz bağlantısı (demo) ────────
+  await prisma.healthIngestToken.create({
+    data: { userId: user.id, token: "demo-health-token-emre", lastUsedAt: new Date() },
+  });
+  await prisma.deviceConnection.create({
+    data: { userId: user.id, provider: "apple_health", status: "connected", lastSyncAt: new Date() },
+  });
+
   console.log(`✓ Seeded user ${user.email} with ${DAYS} days of history + ${exercises.length} exercises & a 3-day program.`);
 }
 
