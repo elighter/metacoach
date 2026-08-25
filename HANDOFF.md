@@ -1,7 +1,7 @@
 # MetaCoach — Oturum Devir Dokümanı (Handoff)
 
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
-> Tarih: 2026-08-15 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse eklendi.
+> Tarih: 2026-08-25 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse, Antrenman modülü eklendi. **Son:** Ön Değerlendirme modülü (`/assessment`) + öğün fotoğrafı galeriden yükleme fix'i — PR #2 master'a merge edildi (Vercel prod deploy tetiklendi; kullanıcı prod doğrulaması bekliyor).
 
 ---
 
@@ -82,7 +82,8 @@ src/
     login/ register/          # auth ekranları (client)
     upload/                   # yükle → AI parse → onay akışı (client)
     biometrics/               # Mi Scale paneli + ölçüm geçmişi
-    nutrition/ metabolism/ profile/ settings/
+    nutrition/ metabolism/ profile/ settings/ workout/
+    assessment/               # Ön Değerlendirme (antrenör görüşmesi öncesi intake) — server + form
     api/
       auth/[...nextauth]/     # NextAuth handlers
       register/               # kayıt
@@ -92,6 +93,8 @@ src/
       metabolism/recompute/
       profile/ settings/
       dashboard/layout/       # widget yerleşimi kaydet
+      workouts/generate/ workouts/session/[id]/ workouts/set/[id]/  # antrenman
+      assessment/             # ön değerlendirme upsert (POST, zod, taslak/gönder)
       push/subscribe/ push/test/   # web push
       health/                 # DB ping, auth'suz
   components/
@@ -103,7 +106,9 @@ src/
     mi-scale-panel.tsx        # Web Bluetooth + simülatör
     onboarding.tsx            # 5 adımlı wizard (localStorage ile ilk giriş takibi)
     help-fab.tsx              # sağ alt köşe floating yardım butonu + accordion panel
-    nutrition-client.tsx      # öğün listesi + fotoğraf AI parse + manuel arama
+    nutrition-client.tsx      # öğün listesi + fotoğraf AI parse (kamera+galeri ayrı input) + manuel arama
+    workout-client.tsx        # /workout etkileşimi
+    assessment-client.tsx     # ön değerlendirme 3-bölümlü form + hazırlık göstergesi
     profile-form.tsx  settings-form.tsx
     push-controls.tsx  pwa-register.tsx  recompute-button.tsx
   lib/
@@ -118,14 +123,18 @@ src/
     dashboard-data.ts         # dashboard veri toplayıcı + TDEE hesaplar
     widgets.ts                # widget kaydı & varsayılan yerleşim
     meals.ts  utils.ts
+    assessment.ts               # ön değerlendirme: etiketler, hazırlık skoru, lab referans aralıkları (server+client paylaşır)
     workout-library.ts          # 34 egzersizlik salon kütüphanesi (saf veri, faz etiketli) — seed+app paylaşır
     workout.ts                  # şablon program üretici + kcal tahmini + adaptif protein
     workout-ai.ts               # Claude program üretici (strict tool call) + aiConfigured()
     workout-service.ts          # regenerateProgram: plan (AI/şablon) → WorkoutProgram+Session+Set kaydı
 prisma/schema.prisma          # User, LabResult, LabBiomarker, Biometric, Meal, DailyLog,
                               # FileAsset, DeviceConnection, Consent, FoodItem,
-                              # MetabolismEstimate, DashboardLayout, Settings, PushSubscription
+                              # MetabolismEstimate, DashboardLayout, Settings, PushSubscription,
+                              # Exercise, WorkoutProgram, WorkoutSession, WorkoutSet, CoachAssessment
 prisma/migrations/0_init/     # Postgres init migration (14 tablo)
+prisma/migrations/20260825110158_add_workout_module/   # antrenman tabloları
+prisma/migrations/20260825120000_add_coach_assessment/ # CoachAssessment tablosu
 prisma/seed.ts                # Emre + 28 gün geçmiş + lab + öğünler + Mi Scale ölçümleri (+bcrypt şifre)
 scripts/set-db-provider.mjs   # DATABASE_URL'den provider otomatik ayar
 .github/workflows/ci.yml      # typecheck + lint + build + Postgres migrate smoke
@@ -152,9 +161,11 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Onboarding** ✅: 5 adımlı wizard (ilk girişte otomatik, localStorage ile takip, Help'ten tekrar erişim).
 - **Help FAB** ✅: Sağ alt köşe floating button, accordion yardım paneli, tanıtım turu tekrar açma.
 - **AI meal photo parse** ✅: Tabak fotoğrafı → Claude Vision → yiyecek tanıma + kalori/makro hesaplama, onay sonrası kayıt. Mock fallback mevcut.
+- **Ön Değerlendirme modülü** ✅ (2026-08-25, PR #2 master'a merge — build/lint/typecheck temiz; **prod doğrulaması kullanıcıda**): Antrenör/diyetisyen görüşmesi öncesi 3-bölümlük intake — ① son 2-3 günlük yemek alışkanlıkları (serbest metin), ② kişisel rutin (uyanış/uyku saati + hareket seviyesi), ③ son kan tahlilleri varsa (B12, D vit, açlık insülini, HOMA-IR, TSH → referans aralığına göre düşük/normal/yüksek rozet). `/assessment` sayfası + hazırlık göstergeli form (taslak kaydet / görüşmeye gönder), `CoachAssessment` modeli (kullanıcı başına tek kayıt, upsert), `POST /api/assessment`, nav girişi, demo seed. **Not:** kendini-değerlendirme aracı; referans aralıkları bilgi amaçlı, tanı değil.
+- **Fix: öğün fotoğrafı galeriden yükleme** ✅ (2026-08-25, PR #2): `nutrition-client.tsx` tek `<input capture="environment">` kullanıyordu → mobil tarayıcıyı kameraya zorlayıp galeriyi engelliyordu. Kamera (capture'lı) + galeri (capture'sız) için ayrı input ve "Fotoğraf çek" / "Galeriden yükle" iki buton. (Masaüstünde zaten seçici açılıyordu; asıl etki mobilde.)
 - **Antrenman modülü** ✅ (2026-08-25, tarayıcıda doğrulandı): 4 fazlı periyodizasyon (hazırlık→ana yüklenme→kardiyo→soğuma), 3 gün A/B split (A=kuvvet, B=fonksiyonel). Claude ile kişiye özel program üretimi (strict tool call) + deterministik şablon fallback. 34 egzersizlik salon kütüphanesi. `/workout` sayfası (4 faz akordeonu, set işaretle/ağırlık logla, seansı tamamla), dashboard `nextWorkout` widget'ı, "Antrenman" nav. Adaptif antrenman-günü protein artışı. **Kritik karar:** tahmini yakılan kalori sadece gösterim — Dynamic TDEE'ye BESLENMEZ (çift sayım önlenir; TDEE zaten toplam harcamayı kilo/alım'dan öğreniyor). estKcal doğrulandı (519 kcal / 59 dk).
 
-**Build:** 29 route + middleware, tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app`
+**Build:** 30+ route + middleware (workout + assessment dahil), tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app`
 
 ---
 
@@ -215,6 +226,11 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - AI meal photo parse (Beslenme sayfası) ✅
 - Güvenlik başlıkları (CSP, HSTS, X-Frame-Options) ✅
 - Next.js 15.5.23 (CVE-2025-66478 fix) ✅
+
+### ⏳ Prod doğrulaması bekleyen (2026-08-25, PR #2 merge sonrası)
+- **Ön Değerlendirme (`/assessment`)** — merge edildi, Vercel deploy tetiklendi; canlıda kullanıcı doğrulaması bekleniyor.
+- **Öğün fotoğrafı galeriden yükleme** — aynı deploy. Kullanıcı ilk kontrolde "durum aynı" dedi; bunun nedeni değişikliğin o an sadece feature dalında olmasıydı (master'a merge edilmemişti). PR #2 ile master'a alındı. Mobilde hâlâ eskiyse **PWA/service-worker cache** şüphesi — hard-refresh / uygulamayı kapat-aç.
+- **Migration:** `20260825120000_add_coach_assessment` prod build'de `prisma migrate deploy` ile Neon'a uygulanır — deploy loglarında doğrulanmalı.
 
 ---
 
