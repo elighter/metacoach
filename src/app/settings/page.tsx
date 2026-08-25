@@ -5,11 +5,13 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();
-  const [settings, devices, consents] = await Promise.all([
+  const [settings, devices, consents, healthToken] = await Promise.all([
     prisma.settings.findUnique({ where: { userId: user.id } }),
     prisma.deviceConnection.findMany({ where: { userId: user.id } }),
     prisma.consent.findMany({ where: { userId: user.id, revokedAt: null } }),
+    prisma.healthIngestToken.findUnique({ where: { userId: user.id } }),
   ]);
+  const appleHealthSync = devices.find((d) => d.provider === "apple_health");
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -34,6 +36,10 @@ export default async function SettingsPage() {
             version: c.version,
             grantedAt: c.grantedAt.toISOString(),
           }))}
+          appleHealth={{
+            token: healthToken?.token ?? null,
+            lastSyncAt: appleHealthSync?.lastSyncAt ? appleHealthSync.lastSyncAt.toISOString() : null,
+          }}
         />
       </div>
     </div>

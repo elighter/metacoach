@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Loader2, Check, Sun, Moon, Monitor, Bluetooth, Heart, Download, Trash2, ShieldCheck } from "lucide-react";
+import { Save, Loader2, Check, Sun, Moon, Monitor, Bluetooth, Heart, Download, Trash2, ShieldCheck, Activity, Copy, RefreshCw } from "lucide-react";
+import { fmtDate } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
 import { PushControls } from "@/components/push-controls";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ interface SettingsData {
 }
 interface Device { provider: string; status: string; lastSyncAt: string | null }
 interface ConsentItem { type: string; version: string; grantedAt: string }
+interface AppleHealth { token: string | null; lastSyncAt: string | null }
 
 const deviceMeta: Record<string, { label: string; icon: any }> = {
   mi_scale: { label: "Mi Body Composition Scale 2", icon: Bluetooth },
@@ -44,10 +46,12 @@ export function SettingsForm({
   initial,
   devices,
   consents,
+  appleHealth,
 }: {
   initial: SettingsData;
   devices: Device[];
   consents: ConsentItem[];
+  appleHealth: AppleHealth;
 }) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -130,6 +134,9 @@ export function SettingsForm({
         </button>
       </div>
 
+      {/* Apple Health / activity sync */}
+      <AppleHealthCard appleHealth={appleHealth} />
+
       {/* Devices */}
       <Section title="Bağlı cihazlar">
         {devices.map((d) => {
@@ -170,6 +177,108 @@ export function SettingsForm({
         </div>
       </Section>
     </div>
+  );
+}
+
+function AppleHealthCard({ appleHealth }: { appleHealth: AppleHealth }) {
+  const [token, setToken] = useState(appleHealth.token);
+  const [origin, setOrigin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState<"url" | "token" | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") setOrigin(window.location.origin);
+  }, []);
+
+  const webhookUrl = origin ? `${origin}/api/ingest/health` : "/api/ingest/health";
+
+  async function generate() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/settings/health-token", { method: "POST" });
+      if (res.ok) setToken((await res.json()).token);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy(text: string, which: "url" | "token") {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* pano erişimi yoksa sessiz geç */
+    }
+  }
+
+  return (
+    <div className="card p-5">
+      <div className="kicker mb-3">Apple Health & Aktivite</div>
+      <div className="mb-4 flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-wash text-primary-ink">
+          <Activity className="h-[18px] w-[18px]" />
+        </span>
+        <p className="text-sm text-ink-3">
+          Apple Watch ve Technogym verini otomatik akıt. iPhone Sağlık → aktif kalori, adım ve
+          antrenmanlar, aşağıdaki adrese periyodik gönderilir. Aktivite düzeyin otomatik kalibre
+          edilir; elle antrenman girmene gerek kalmaz.
+        </p>
+      </div>
+
+      {!token ? (
+        <button className="btn btn-primary" onClick={generate} disabled={busy}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+          Aktivite senkronunu etkinleştir
+        </button>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <Field label="Webhook adresi" value={webhookUrl} onCopy={() => copy(webhookUrl, "url")} copied={copied === "url"} />
+          <Field label="Token (gizli)" value={token} mono onCopy={() => copy(token, "token")} copied={copied === "token"} />
+
+          <div className="rounded-lg bg-surface-2 p-3 text-xs leading-relaxed text-ink-2">
+            <div className="mb-1 font-semibold text-ink">Kurulum (Health Auto Export)</div>
+            <ol className="ml-4 list-decimal space-y-0.5">
+              <li>App Store'dan <b>Health Auto Export – JSON+CSV</b> kur.</li>
+              <li><b>Automations → REST API</b> ekle; URL'ye webhook adresini yapıştır.</li>
+              <li>Header ekle: <span className="font-mono">Authorization: Bearer &lt;token&gt;</span></li>
+              <li>Metrikler: <b>Active Energy, Step Count, Workouts</b>. Aggregation: <b>Daily</b>, format <b>JSON</b>.</li>
+              <li>Otomasyonu günlük çalışacak şekilde kaydet.</li>
+            </ol>
+            <div className="mt-2 text-ink-3">Alternatif: Apple Kısayol ile aynı adrese POST eden bir otomasyon da kullanılabilir.</div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button className="btn" onClick={generate} disabled={busy}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Token'ı yenile
+            </button>
+            <span className="text-xs text-ink-3">
+              {appleHealth.lastSyncAt
+                ? `Son senkron: ${fmtDate(appleHealth.lastSyncAt, { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}`
+                : "Henüz veri alınmadı."}
+            </span>
+          </div>
+          <p className="text-xs text-ink-3">
+            Token'ı gizli tut; yenilersen eski kurulum çalışmayı durdurur ve adresi güncellemen gerekir.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, mono, onCopy, copied }: { label: string; value: string; mono?: boolean; onCopy: () => void; copied: boolean }) {
+  return (
+    <label className="block">
+      <span className="label">{label}</span>
+      <div className="flex gap-2">
+        <input readOnly value={value} className={cn("input", mono && "font-mono text-xs")} onFocus={(e) => e.currentTarget.select()} />
+        <button className="btn shrink-0 px-3" onClick={onCopy} aria-label="Kopyala">
+          {copied ? <Check className="h-4 w-4 text-good" /> : <Copy className="h-4 w-4" />}
+        </button>
+      </div>
+    </label>
   );
 }
 
