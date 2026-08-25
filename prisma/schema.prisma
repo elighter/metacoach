@@ -41,6 +41,7 @@ model User {
   pushSubscriptions   PushSubscription[]
   workoutPrograms     WorkoutProgram[]
   workoutSessions     WorkoutSession[]
+  coachAssessment     CoachAssessment?
 }
 
 model FileAsset {
@@ -280,4 +281,36 @@ model WorkoutSet {
   weightKg   Float?
   done       Boolean        @default(false)
   actualReps String?
+}
+
+// ── Ön değerlendirme (antrenör görüşmesi öncesi) ───────────────────────────
+// Diyetisyen/antrenör görüşmesinden önce toplanan kısa hazırlık anketi:
+// (1) son 2-3 günlük yemek alışkanlıkları, (2) kişisel rutin (uyku/hareket),
+// (3) varsa son kan tahlili değerleri. Kullanıcı başına tek kayıt (upsert).
+model CoachAssessment {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 1 — Günlük yemek alışkanlıkları (son 2-3 gün)
+  dietRecall String? // serbest metin: son 2-3 günde yenenlerin kısa listesi
+
+  // 2 — Kişisel rutin
+  wakeTime      String? // "HH:MM" — uyanış saati
+  sleepTime     String? // "HH:MM" — uyku saati
+  activityLevel String? // sedentary | light | moderate | active | athlete
+  routineNote   String? // gün içi hareket seviyesi / ek notlar
+
+  // 3 — Son kan tahlilleri (varsa)
+  b12            Float? // pg/mL
+  vitaminD       Float? // ng/mL (25-OH D)
+  fastingInsulin Float? // µIU/mL
+  homaIR         Float? // insülin direnci (HOMA-IR)
+  tsh            Float? // mIU/L (tiroit)
+  labNote        String?
+
+  status      String    @default("draft") // draft | submitted
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

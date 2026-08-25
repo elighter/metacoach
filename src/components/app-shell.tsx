@@ -11,6 +11,7 @@ import {
   Utensils,
   Dumbbell,
   Gauge,
+  ClipboardList,
   User,
   Settings,
   Menu,
@@ -37,6 +38,7 @@ const NAV = [
   { href: "/nutrition", label: "Beslenme", icon: Utensils },
   { href: "/workout", label: "Antrenman", icon: Dumbbell },
   { href: "/metabolism", label: "Metabolizma", icon: Gauge },
+  { href: "/assessment", label: "Ön Değerlendirme", icon: ClipboardList },
   { href: "/profile", label: "Profil", icon: User },
   { href: "/settings", label: "Ayarlar", icon: Settings },
 ];
