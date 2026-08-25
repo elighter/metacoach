@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Plus, Trash2, Loader2, Utensils, Camera, CheckCircle2, X, Sparkles } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, Utensils, Camera, Image as ImageIcon, CheckCircle2, X, Sparkles } from "lucide-react";
 import { fmt } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -52,8 +52,10 @@ export function NutritionClient({ initialMeals }: { initialMeals: Meal[] }) {
   const [grams, setGrams] = useState(100);
   const [busy, setBusy] = useState(false);
 
-  // Photo parse state
-  const fileRef = useRef<HTMLInputElement>(null);
+  // Photo parse state — kamera (capture) ve galeri için ayrı girişler;
+  // tek input'ta capture="environment" mobilde galeriyi engelliyordu.
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoParsing, setPhotoParsing] = useState(false);
   const [photoItems, setPhotoItems] = useState<ParsedItem[]>([]);
@@ -122,7 +124,8 @@ export function NutritionClient({ initialMeals }: { initialMeals: Meal[] }) {
     setPhotoItems([]);
     setPhotoError(null);
     setPhotoProvider(null);
-    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
+    if (galleryRef.current) galleryRef.current.value = "";
   }
 
   useEffect(() => {
@@ -235,9 +238,9 @@ export function NutritionClient({ initialMeals }: { initialMeals: Meal[] }) {
           ))}
         </div>
 
-        {/* Photo upload */}
+        {/* Photo upload — kamera: capture ile; galeri: capture olmadan */}
         <input
-          ref={fileRef}
+          ref={cameraRef}
           type="file"
           accept="image/*"
           capture="environment"
@@ -247,15 +250,34 @@ export function NutritionClient({ initialMeals }: { initialMeals: Meal[] }) {
             if (f) handlePhoto(f);
           }}
         />
+        <input
+          ref={galleryRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handlePhoto(f);
+          }}
+        />
 
         {!photoPreview && photoItems.length === 0 && (
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-strong bg-surface-2 px-3 py-4 text-sm font-medium text-ink-2 transition-colors hover:border-primary hover:text-primary-ink"
-          >
-            <Camera className="h-5 w-5" />
-            Tabak fotoğrafı çek / yükle
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => cameraRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-strong bg-surface-2 px-3 py-4 text-sm font-medium text-ink-2 transition-colors hover:border-primary hover:text-primary-ink"
+            >
+              <Camera className="h-5 w-5" />
+              Fotoğraf çek
+            </button>
+            <button
+              onClick={() => galleryRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border-strong bg-surface-2 px-3 py-4 text-sm font-medium text-ink-2 transition-colors hover:border-primary hover:text-primary-ink"
+            >
+              <ImageIcon className="h-5 w-5" />
+              Galeriden yükle
+            </button>
+          </div>
         )}
 
         {photoPreview && (
