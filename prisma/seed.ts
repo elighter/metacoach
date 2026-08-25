@@ -2,6 +2,8 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { miBodyComposition } from "../src/lib/mi-scale";
 import { defaultLayout } from "../src/lib/widgets";
+import { EXERCISE_LIBRARY } from "../src/lib/workout-library";
+import { buildSessionPlan, planWeeklyDays, DAY_LABEL } from "../src/lib/workout";
 
 const prisma = new PrismaClient();
 
@@ -27,6 +29,7 @@ async function main() {
   // Clean slate (cascades handle children).
   await prisma.user.deleteMany({ where: { email } });
   await prisma.foodItem.deleteMany({});
+  await prisma.exercise.deleteMany({});
 
   const dob = new Date("1991-05-14");
   const heightCm = 179;
@@ -244,7 +247,52 @@ async function main() {
     w++;
   }
 
-  console.log(`✓ Seeded user ${user.email} with ${DAYS} days of history.`);
+  // ── Exercise library (gym, tagged by 4-phase model) ──
+  await prisma.exercise.createMany({ data: EXERCISE_LIBRARY });
+  const exercises = await prisma.exercise.findMany();
+  const exBySlug = new Map(exercises.map((e) => [e.slug, e]));
+
+  // ── Starter workout program: 3-day A/B, goal-aware (Emre = cut) ──
+  const goal = "cut" as const;
+  const program = await prisma.workoutProgram.create({
+    data: {
+      userId: user.id,
+      name: "Kesim — 3 Gün A/B",
+      goal,
+      daysPerWeek: 3,
+      source: "template",
+      active: true,
+      notes: "Full-body A/B dönüşümlü, 4 fazlı periyodizasyon. Kesim için tekrar hacmi ve kardiyo öne çıkar.",
+    },
+  });
+  const dayTypes = planWeeklyDays(3);
+  for (let i = 0; i < dayTypes.length; i++) {
+    const dayType = dayTypes[i];
+    const plan = buildSessionPlan(dayType, i, goal);
+    await prisma.workoutSession.create({
+      data: {
+        userId: user.id,
+        programId: program.id,
+        scheduledFor: midnight(new Date(Date.now() + i * 2 * 86_400_000)),
+        dayType,
+        label: DAY_LABEL[dayType],
+        status: "planned",
+        sets: {
+          create: plan
+            .filter((s) => exBySlug.has(s.slug))
+            .map((s) => ({
+              exerciseId: exBySlug.get(s.slug)!.id,
+              phase: s.phase,
+              orderIdx: s.orderIdx,
+              targetSets: s.targetSets,
+              targetReps: s.targetReps,
+            })),
+        },
+      },
+    });
+  }
+
+  console.log(`✓ Seeded user ${user.email} with ${DAYS} days of history + ${exercises.length} exercises & a 3-day program.`);
 }
 
 main()

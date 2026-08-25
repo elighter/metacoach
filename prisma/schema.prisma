@@ -39,6 +39,8 @@ model User {
   dashboardLayout     DashboardLayout?
   settings            Settings?
   pushSubscriptions   PushSubscription[]
+  workoutPrograms     WorkoutProgram[]
+  workoutSessions     WorkoutSession[]
 }
 
 model FileAsset {
@@ -210,4 +212,72 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
+}
+
+// ── Training / workout program ─────────────────────────────────────────────
+// The 4-phase periodized session model: activation → strength|functional →
+// cardio → cooldown. A 3-day plan alternates A (strength) and B (functional).
+
+model Exercise {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  phase         String // activation | strength | functional | cardio | cooldown
+  muscleGroup   String // legs | push | pull | core | full | mobility | cardio
+  equipment     String // barbell | dumbbell | machine | cable | bodyweight | kettlebell | cardio_machine | foam_roller | band
+  met           Float    @default(5) // metabolic equivalent, for kcal estimate
+  unit          String   @default("reps") // reps | seconds | meters
+  instructionTr String?
+  createdAt     DateTime @default(now())
+
+  sets WorkoutSet[]
+}
+
+model WorkoutProgram {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  goal        String // cut | maintain | bulk
+  daysPerWeek Int      @default(3)
+  splitType   String   @default("ab") // ab
+  source      String   @default("template") // ai | template
+  active      Boolean  @default(true)
+  notes       String? // AI rationale / coaching note
+  createdAt   DateTime @default(now())
+
+  sessions WorkoutSession[]
+}
+
+model WorkoutSession {
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId    String?
+  program      WorkoutProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  scheduledFor DateTime
+  dayType      String // strength | functional
+  label        String // "A · Kuvvet" | "B · Fonksiyonel"
+  status       String          @default("planned") // planned | in_progress | completed | skipped
+  completedAt  DateTime?
+  durationMin  Int?
+  estKcal      Float?
+  createdAt    DateTime        @default(now())
+
+  sets WorkoutSet[]
+}
+
+model WorkoutSet {
+  id         String         @id @default(cuid())
+  sessionId  String
+  session    WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  phase      String // activation | strength | functional | cardio | cooldown
+  orderIdx   Int            @default(0)
+  targetSets Int            @default(3)
+  targetReps String         @default("10") // "8-12", or seconds/meters for timed work
+  weightKg   Float?
+  done       Boolean        @default(false)
+  actualReps String?
 }

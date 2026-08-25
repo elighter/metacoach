@@ -118,6 +118,10 @@ src/
     dashboard-data.ts         # dashboard veri toplayıcı + TDEE hesaplar
     widgets.ts                # widget kaydı & varsayılan yerleşim
     meals.ts  utils.ts
+    workout-library.ts          # 34 egzersizlik salon kütüphanesi (saf veri, faz etiketli) — seed+app paylaşır
+    workout.ts                  # şablon program üretici + kcal tahmini + adaptif protein
+    workout-ai.ts               # Claude program üretici (strict tool call) + aiConfigured()
+    workout-service.ts          # regenerateProgram: plan (AI/şablon) → WorkoutProgram+Session+Set kaydı
 prisma/schema.prisma          # User, LabResult, LabBiomarker, Biometric, Meal, DailyLog,
                               # FileAsset, DeviceConnection, Consent, FoodItem,
                               # MetabolismEstimate, DashboardLayout, Settings, PushSubscription
@@ -148,8 +152,9 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Onboarding** ✅: 5 adımlı wizard (ilk girişte otomatik, localStorage ile takip, Help'ten tekrar erişim).
 - **Help FAB** ✅: Sağ alt köşe floating button, accordion yardım paneli, tanıtım turu tekrar açma.
 - **AI meal photo parse** ✅: Tabak fotoğrafı → Claude Vision → yiyecek tanıma + kalori/makro hesaplama, onay sonrası kayıt. Mock fallback mevcut.
+- **Antrenman modülü** ✅ (2026-08-25, tarayıcıda doğrulandı): 4 fazlı periyodizasyon (hazırlık→ana yüklenme→kardiyo→soğuma), 3 gün A/B split (A=kuvvet, B=fonksiyonel). Claude ile kişiye özel program üretimi (strict tool call) + deterministik şablon fallback. 34 egzersizlik salon kütüphanesi. `/workout` sayfası (4 faz akordeonu, set işaretle/ağırlık logla, seansı tamamla), dashboard `nextWorkout` widget'ı, "Antrenman" nav. Adaptif antrenman-günü protein artışı. **Kritik karar:** tahmini yakılan kalori sadece gösterim — Dynamic TDEE'ye BESLENMEZ (çift sayım önlenir; TDEE zaten toplam harcamayı kilo/alım'dan öğreniyor). estKcal doğrulandı (519 kcal / 59 dk).
 
-**Build:** 26 route + middleware, tip hatası yok, CI yeşil. **Prod:** `metacoach-three.vercel.app`
+**Build:** 29 route + middleware, tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app`
 
 ---
 

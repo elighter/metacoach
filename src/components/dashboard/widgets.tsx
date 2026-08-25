@@ -11,6 +11,7 @@ import {
   Beef,
   Wheat,
   Nut,
+  Dumbbell,
 } from "lucide-react";
 import type { DashboardData } from "@/lib/dashboard-data";
 import { Sparkline, WeightEnergyChart, Ring } from "@/components/charts";
@@ -254,6 +255,34 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
           </div>
         </Panel>
       );
+    case "nextWorkout": {
+      const w = data.workout;
+      return (
+        <Panel title="Antrenman" right={<Dumbbell className="h-4 w-4 text-primary-ink" />}>
+          {w.hasSession ? (
+            <a href="/workout" className="block">
+              <div className="text-lg font-bold tracking-tight">{w.label}</div>
+              <div className="mt-0.5 text-xs text-ink-3">
+                {w.scheduledFor ? fmtDate(w.scheduledFor, { weekday: "long", day: "numeric", month: "short" }) : ""} · {w.exerciseCount} hareket
+              </div>
+              <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-ink">
+                Seansı aç →
+              </div>
+            </a>
+          ) : (
+            <a href="/workout" className="block">
+              <div className="text-sm text-ink-2">Henüz program yok.</div>
+              <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-ink">
+                Program oluştur →
+              </div>
+            </a>
+          )}
+          <div className="mt-3 border-t border-border/60 pt-2.5 text-xs text-ink-3">
+            Bu hafta <b className="text-ink">{w.completedThisWeek}</b> seans tamamlandı
+          </div>
+        </Panel>
+      );
+    }
     default:
       return null;
   }

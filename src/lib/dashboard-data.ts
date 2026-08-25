@@ -98,6 +98,26 @@ export async function getDashboardData(userId: string) {
     carb: Math.round((target - (latestBio?.weightKg ?? 80) * 2 * 4 - target * 0.28) / 4),
   };
 
+  // ── Workout: next session + weekly adherence ──
+  const [nextSession, completedThisWeek] = await Promise.all([
+    prisma.workoutSession.findFirst({
+      where: { userId, scheduledFor: { gte: startOfDay(new Date()) }, status: { not: "completed" } },
+      orderBy: { scheduledFor: "asc" },
+      include: { _count: { select: { sets: true } } },
+    }),
+    prisma.workoutSession.count({
+      where: { userId, status: "completed", completedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } },
+    }),
+  ]);
+  const workout = {
+    hasSession: !!nextSession,
+    label: nextSession?.label ?? null,
+    dayType: nextSession?.dayType ?? null,
+    scheduledFor: nextSession?.scheduledFor.toISOString() ?? null,
+    exerciseCount: nextSession?._count.sets ?? 0,
+    completedThisWeek,
+  };
+
   // Weight change over window
   const firstTrend = weightPts.length ? trendMap.get(startOfDay(weightPts[0].date).getTime()) : null;
   const lastTrend = tdee.trendWeightKg;
@@ -120,6 +140,7 @@ export async function getDashboardData(userId: string) {
     estimates,
     weightDelta,
     goal: user.goal,
+    workout,
   };
 }
 
