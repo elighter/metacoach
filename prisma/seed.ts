@@ -292,6 +292,28 @@ async function main() {
     });
   }
 
+  // ── Ön değerlendirme (antrenör görüşmesi öncesi hazırlık) ──────────────
+  await prisma.coachAssessment.create({
+    data: {
+      userId: user.id,
+      dietRecall:
+        "Dün — kahvaltı: 2 yumurta + beyaz peynir + zeytin + tam buğday ekmek; öğle: ızgara tavuk + bulgur pilavı + salata; akşam: mercimek çorbası + yoğurt.\n" +
+        "Evvelsi gün — kahvaltı: yulaf + süt + muz; öğle: ton balıklı salata; akşam: fırında somon + sebze.",
+      wakeTime: "07:00",
+      sleepTime: "23:30",
+      activityLevel: "moderate",
+      routineNote: "Masa başı iş; haftada 3 gün antrenman, akşamları 30 dk yürüyüş.",
+      b12: 310,
+      vitaminD: 22,
+      fastingInsulin: 9.4,
+      homaIR: 1.8,
+      tsh: 2.1,
+      labNote: "Yaklaşık 3 hafta önce, aç karnına alındı.",
+      status: "submitted",
+      submittedAt: new Date(),
+    },
+  });
+
   console.log(`✓ Seeded user ${user.email} with ${DAYS} days of history + ${exercises.length} exercises & a 3-day program.`);
 }
 
