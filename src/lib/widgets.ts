@@ -13,6 +13,7 @@ export const WIDGETS: WidgetDef[] = [
   { id: "weight", title: "Ağırlık trendi", description: "EWMA yumuşatılmış", colSpan: 1 },
   { id: "bodyfat", title: "Vücut yağı", description: "Son ölçüm", colSpan: 1 },
   { id: "caloriesToday", title: "Bugün alınan", description: "Kalori / hedef", colSpan: 1 },
+  { id: "activity", title: "Aktivite", description: "Apple Health: aktif kalori & adım", colSpan: 2 },
   { id: "nextWorkout", title: "Antrenman", description: "Sıradaki seans", colSpan: 1 },
   { id: "weeklyBalance", title: "Haftalık kalori dengesi", description: "Alınan vs yakılan (TDEE)", colSpan: 2 },
   { id: "weightEnergyChart", title: "Ağırlık & Enerji Dengesi", description: "Trend + günlük alım", colSpan: 4 },

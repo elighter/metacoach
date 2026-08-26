@@ -1,5 +1,5 @@
 import { getCurrentUser, prisma } from "@/lib/db";
-import { startOfDay } from "@/lib/utils";
+import { startOfDay, daysAgo, fmt, fmtDate } from "@/lib/utils";
 import { PHASE_LABEL, PHASE_HINT, type Phase } from "@/lib/workout-library";
 import { trainingDayProtein, type DayType, type Goal } from "@/lib/workout";
 import { WorkoutClient, type SessionView } from "@/components/workout-client";
@@ -12,7 +12,7 @@ export default async function WorkoutPage() {
   const user = await getCurrentUser();
   const today = startOfDay(new Date());
 
-  const [program, sessions, bio] = await Promise.all([
+  const [program, sessions, bio, recent] = await Promise.all([
     prisma.workoutProgram.findFirst({ where: { userId: user.id, active: true } }),
     prisma.workoutSession.findMany({
       where: { userId: user.id, scheduledFor: { gte: today } },
@@ -25,6 +25,12 @@ export default async function WorkoutPage() {
       },
     }),
     prisma.biometric.findFirst({ where: { userId: user.id }, orderBy: { measuredAt: "desc" }, select: { weightKg: true } }),
+    // Son tamamlanan seanslar (Apple Health'ten içe alınanlar dahil)
+    prisma.workoutSession.findMany({
+      where: { userId: user.id, status: "completed", completedAt: { gte: daysAgo(21) } },
+      orderBy: { completedAt: "desc" },
+      take: 12,
+    }),
   ]);
 
   // Today's (or next) actionable session = first not-yet-completed upcoming one.
@@ -93,6 +99,34 @@ export default async function WorkoutPage() {
         upcoming={upcoming}
         proteinNote={proteinNote}
       />
+
+      {recent.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold tracking-tight">Son antrenmanlar</h2>
+          <p className="mt-0.5 text-sm text-ink-3">Tamamlanan seanslar · Apple Health'ten gelenler otomatik işaretlenir.</p>
+          <div className="mt-3 flex flex-col gap-2">
+            {recent.map((s) => (
+              <div key={s.id} className="card flex items-center justify-between gap-3 p-3.5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">{s.label}</span>
+                    {s.source === "imported" && (
+                      <span className="pill bg-primary-wash text-primary-ink">Apple Health</span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 text-xs text-ink-3">
+                    {fmtDate(s.completedAt ?? s.scheduledFor, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right text-xs text-ink-2">
+                  {s.durationMin ? <span className="tabular-nums">{s.durationMin} dk</span> : null}
+                  {s.estKcal ? <span className="ml-2 tabular-nums">{fmt(s.estKcal)} kcal</span> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
