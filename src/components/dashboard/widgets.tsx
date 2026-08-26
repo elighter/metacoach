@@ -14,7 +14,7 @@ import {
   Dumbbell,
 } from "lucide-react";
 import type { DashboardData } from "@/lib/dashboard-data";
-import { Sparkline, WeightEnergyChart, Ring } from "@/components/charts";
+import { Sparkline, WeightEnergyChart, CalorieBalanceChart, Ring } from "@/components/charts";
 import { fmt, fmtDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +39,7 @@ function Kpi({
     delta?.dir === "down" ? "text-good" : delta?.dir === "up" ? "text-good" : "text-ink-3";
   const DirIcon = delta?.dir === "up" ? TrendingUp : TrendingDown;
   return (
-    <div className="card relative overflow-hidden p-4">
+    <div className="card relative h-full overflow-hidden p-4">
       <div className="flex items-center gap-2 text-xs font-medium text-ink-3">
         <span className="grid h-[22px] w-[22px] place-items-center rounded-[7px]" style={{ background: tint }}>
           <Icon className="h-3.5 w-3.5" />
@@ -75,7 +75,7 @@ function Panel({
   className?: string;
 }) {
   return (
-    <div className={cn("card p-4", className)}>
+    <div className={cn("card h-full p-4", className)}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <div className="text-[0.95rem] font-semibold">{title}</div>
@@ -157,6 +157,32 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
           spark={<Sparkline data={calSeries} color="var(--warn)" bars />}
         />
       );
+    case "weeklyBalance": {
+      const week = chart.filter((c) => c.calories != null).slice(-7).map((c) => ({
+        label: c.label,
+        intake: c.calories as number,
+      }));
+      const days = week.filter((d) => d.intake > 0);
+      const avgIntake = days.length ? Math.round(days.reduce((s, d) => s + d.intake, 0) / days.length) : 0;
+      const avgBalance = avgIntake > 0 ? avgIntake - tdee.tdee : 0;
+      return (
+        <Panel
+          title="Haftalık kalori dengesi"
+          sub="Günlük alınan · yakılan (TDEE) çizgisi"
+          right={
+            <span className={cn("pill", avgBalance <= 0 ? "bg-good-wash text-good" : "bg-warn-wash text-warn")}>
+              {avgBalance <= 0 ? "" : "+"}{fmt(avgBalance)} kcal/gün ort.
+            </span>
+          }
+        >
+          {week.length >= 2 ? (
+            <CalorieBalanceChart data={week} tdee={tdee.tdee} />
+          ) : (
+            <p className="py-8 text-center text-sm text-ink-3">Trend için en az 2 günlük kayıt gerekli.</p>
+          )}
+        </Panel>
+      );
+    }
     case "weightEnergyChart":
       return (
         <Panel

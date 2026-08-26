@@ -31,13 +31,16 @@ function initialOf(name: string) {
   return (name.trim()[0] ?? "?").toUpperCase();
 }
 
-const NAV = [
+// Birincil: günlük kullanım. İkincil (Hesap): ara sıra açılan / kurulum ekranları.
+const NAV_PRIMARY = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/upload", label: "Yükle & Oku", icon: Upload },
-  { href: "/biometrics", label: "Biyometri", icon: Scale },
   { href: "/nutrition", label: "Beslenme", icon: Utensils },
   { href: "/workout", label: "Antrenman", icon: Dumbbell },
+  { href: "/biometrics", label: "Biyometri", icon: Scale },
+];
+const NAV_SECONDARY = [
   { href: "/metabolism", label: "Metabolizma", icon: Gauge },
+  { href: "/upload", label: "Yükle & Oku", icon: Upload },
   { href: "/assessment", label: "Ön Değerlendirme", icon: ClipboardList },
   { href: "/profile", label: "Profil", icon: User },
   { href: "/settings", label: "Ayarlar", icon: Settings },
@@ -70,29 +73,38 @@ function ThemeToggle() {
   );
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard };
+
+function NavItemLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+        active ? "bg-primary-wash text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+      )}
+    >
+      <item.icon className="h-[18px] w-[18px]" />
+      {item.label}
+    </Link>
+  );
+}
+
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1">
-      {NAV.map((item) => {
-        const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              active
-                ? "bg-primary-wash text-primary-ink"
-                : "text-ink-2 hover:bg-surface-2 hover:text-ink",
-            )}
-          >
-            <item.icon className="h-[18px] w-[18px]" />
-            {item.label}
-          </Link>
-        );
-      })}
+      {NAV_PRIMARY.map((item) => (
+        <NavItemLink key={item.href} item={item} onNavigate={onNavigate} />
+      ))}
+      <div className="mt-3 px-3 pb-1 pt-2 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
+        Hesap
+      </div>
+      {NAV_SECONDARY.map((item) => (
+        <NavItemLink key={item.href} item={item} onNavigate={onNavigate} />
+      ))}
     </nav>
   );
 }
