@@ -8,11 +8,19 @@ import { maybeCalibrateActivity } from "@/lib/activity-calibration";
 // Bu yol auth.config PUBLIC_PREFIXES içinde — koruma burada token ile yapılır.
 export const dynamic = "force-dynamic";
 
+// Yaygın yapıştırma hatalarına toleranslı: sarmalayan boşluk, tırnak ve
+// talimattaki "<token>" yer-tutucu köşeli parantezlerini kırpar.
+function cleanToken(raw: string | null): string | null {
+  if (!raw) return null;
+  const t = raw.trim().replace(/^[<"']+|[>"']+$/g, "").trim();
+  return t.length ? t : null;
+}
+
 function extractToken(req: Request): string | null {
   const auth = req.headers.get("authorization");
-  if (auth?.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
+  if (auth?.toLowerCase().startsWith("bearer ")) return cleanToken(auth.slice(7));
   const url = new URL(req.url);
-  return url.searchParams.get("token");
+  return cleanToken(url.searchParams.get("token"));
 }
 
 export async function POST(req: Request) {
