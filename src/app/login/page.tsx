@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Activity, Loader2 } from "lucide-react";
+
+/** Yalnızca site içi (path) callbackUrl'e izin ver; açık yönlendirmeyi engelle. */
+function safeCallback(): string {
+  if (typeof window === "undefined") return "/";
+  const cb = new URLSearchParams(window.location.search).get("callbackUrl");
+  return cb && cb.startsWith("/") && !cb.startsWith("//") ? cb : "/";
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +19,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cb, setCb] = useState("/");
+
+  useEffect(() => setCb(safeCallback()), []);
+  const isCoachFlow = cb.startsWith("/coach");
+  const registerHref = cb === "/" ? "/register" : `/register?callbackUrl=${encodeURIComponent(cb)}`;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,7 +34,7 @@ export default function LoginPage() {
     if (res?.error) {
       setError("E-posta veya şifre hatalı.");
     } else {
-      router.push("/");
+      router.push(cb);
       router.refresh();
     }
   }
@@ -40,6 +52,11 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {isCoachFlow && (
+          <div className="mb-4 rounded-lg border border-primary/30 bg-primary-wash px-3 py-2 text-center text-sm text-primary-ink">
+            Koç olarak bağlanmak için giriş yap ya da yeni hesap oluştur.
+          </div>
+        )}
         <form onSubmit={submit} className="card flex flex-col gap-4 p-6">
           <h1 className="text-lg font-semibold">Giriş yap</h1>
           <label className="block">
@@ -56,7 +73,7 @@ export default function LoginPage() {
           </button>
           <p className="text-center text-sm text-ink-3">
             Hesabın yok mu?{" "}
-            <Link href="/register" className="font-medium text-primary-ink hover:underline">Kayıt ol</Link>
+            <Link href={registerHref} className="font-medium text-primary-ink hover:underline">Kayıt ol</Link>
           </p>
         </form>
 
