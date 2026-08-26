@@ -8,8 +8,16 @@ import { Activity, Loader2 } from "lucide-react";
 
 function safeCallback(): string {
   if (typeof window === "undefined") return "/";
-  const cb = new URLSearchParams(window.location.search).get("callbackUrl");
-  return cb && cb.startsWith("/") && !cb.startsWith("//") ? cb : "/";
+  const raw = new URLSearchParams(window.location.search).get("callbackUrl");
+  if (!raw) return "/";
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (u.origin === window.location.origin) return u.pathname + u.search;
+  } catch {
+    /* geçersiz URL */
+  }
+  return "/";
 }
 
 export default function RegisterPage() {
