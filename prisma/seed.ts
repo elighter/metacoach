@@ -334,7 +334,13 @@ async function main() {
       disclaimerAt: new Date(),
     },
   });
-  await prisma.coachInvite.create({ data: { clientId: user.id, code: "EMRE123456" } });
+  await prisma.coachInvite.create({
+    data: {
+      clientId: user.id,
+      code: "EMRE123456",
+      permissions: JSON.stringify(["activity", "workout", "nutrition", "metabolism", "assessment"]),
+    },
+  });
   await prisma.coachLink.create({
     data: {
       coachId: coach.id,

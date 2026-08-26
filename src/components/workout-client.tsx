@@ -61,6 +61,7 @@ export function WorkoutClient({ program, current, upcoming, proteinNote }: Props
       ),
   );
   const [completing, setCompleting] = useState(false);
+  const [skipping, setSkipping] = useState(false);
 
   async function generate() {
     setGenerating(true);
@@ -110,6 +111,21 @@ export function WorkoutClient({ program, current, upcoming, proteinNote }: Props
     }
   }
 
+  async function skipSession() {
+    if (!current) return;
+    setSkipping(true);
+    try {
+      const res = await fetch(`/api/workouts/session/${current.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "skipped" }),
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setSkipping(false);
+    }
+  }
+
   const allSets = current?.phases.flatMap((p) => p.sets) ?? [];
   const doneCount = allSets.filter((s) => sets[s.id]?.done).length;
   const progress = allSets.length ? Math.round((doneCount / allSets.length) * 100) : 0;
@@ -152,10 +168,14 @@ export function WorkoutClient({ program, current, upcoming, proteinNote }: Props
             </div>
             {program.notes && <p className="mt-1 max-w-xl text-sm text-ink-3">{program.notes}</p>}
           </div>
-          <button onClick={generate} disabled={generating} className="btn-ghost inline-flex items-center gap-1.5 text-sm">
-            {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Yenile
-          </button>
+          {program.source === "coach" ? (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-ink">Koç programı</span>
+          ) : (
+            <button onClick={generate} disabled={generating} className="btn-ghost inline-flex items-center gap-1.5 text-sm">
+              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Yenile
+            </button>
+          )}
         </div>
       </div>
 
@@ -256,10 +276,14 @@ export function WorkoutClient({ program, current, upcoming, proteinNote }: Props
               </div>
             ))}
 
-            <div className="p-4">
-              <button onClick={completeSession} disabled={completing} className="btn-primary inline-flex w-full items-center justify-center gap-2">
+            <div className="flex gap-2 p-4">
+              <button onClick={completeSession} disabled={completing || skipping} className="btn-primary inline-flex flex-1 items-center justify-center gap-2">
                 {completing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Flame className="h-4 w-4" />}
                 Seansı tamamla
+              </button>
+              <button onClick={skipSession} disabled={completing || skipping} className="btn inline-flex items-center justify-center gap-2" title="Bugün gerçekleşmediyse atla">
+                {skipping ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Bugün olmadı
               </button>
             </div>
           </div>

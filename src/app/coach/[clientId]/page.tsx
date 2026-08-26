@@ -4,6 +4,7 @@ import { getCurrentUser, prisma } from "@/lib/db";
 import { getCoachAccess, canSee, COACH_MODULES } from "@/lib/coach";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { CoachPlanEditor } from "@/components/coach-plan-editor";
+import { CoachProgramBuilder } from "@/components/coach-program-builder";
 import { CoachComments } from "@/components/coach-comments";
 import { fmt, fmtDate } from "@/lib/utils";
 import { ChevronLeft } from "lucide-react";
@@ -88,9 +89,15 @@ export default async function CoachClientPage({ params }: { params: Promise<{ cl
           </div>
         )}
 
-        {/* Plan editörü */}
+        {/* Haftalık program builder */}
         <div className="card p-5">
-          <div className="kicker mb-3">Antrenman planı</div>
+          <div className="kicker mb-3">Haftalık program oluştur</div>
+          <CoachProgramBuilder clientId={clientId} />
+        </div>
+
+        {/* Serbest plan / notlar */}
+        <div className="card p-5">
+          <div className="kicker mb-3">Genel plan & notlar</div>
           <CoachPlanEditor clientId={clientId} current={plan ? { title: plan.title, body: plan.body } : null} />
         </div>
 

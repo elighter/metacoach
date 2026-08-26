@@ -348,11 +348,12 @@ model HealthIngestToken {
 
 // Danışan başına tek davet kodu; koç bunu girerek bağlanır.
 model CoachInvite {
-  id        String   @id @default(cuid())
-  clientId  String   @unique
-  client    User     @relation("CoachInviteClient", fields: [clientId], references: [id], onDelete: Cascade)
-  code      String   @unique
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  clientId    String   @unique
+  client      User     @relation("CoachInviteClient", fields: [clientId], references: [id], onDelete: Cascade)
+  code        String   @unique
+  permissions String   @default("[]") // davetle önden seçilen modül izinleri
+  createdAt   DateTime @default(now())
 }
 
 model CoachLink {
