@@ -24,10 +24,11 @@ import { WIDGET_MAP, normalizeLayout, type WidgetLayoutItem } from "@/lib/widget
 import { DashboardWidget } from "@/components/dashboard/widgets";
 import { cn } from "@/lib/utils";
 
+// Span'ler 4 sütunlu grid'i temiz döşesin diye 1 / 2 / 4 ile sınırlı.
 const SPAN_CLASS: Record<number, string> = {
   1: "lg:col-span-1",
   2: "md:col-span-2 lg:col-span-2",
-  3: "md:col-span-2 lg:col-span-3",
+  4: "md:col-span-2 lg:col-span-4",
 };
 
 function SortableWidget({

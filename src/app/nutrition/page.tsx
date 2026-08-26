@@ -1,16 +1,29 @@
 import { getCurrentUser, prisma } from "@/lib/db";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { NutritionClient } from "@/components/nutrition-client";
-import { startOfDay, fmt } from "@/lib/utils";
+import { startOfDay, daysAgo, fmt, fmtDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+const MEAL_LABEL: Record<string, string> = {
+  breakfast: "Kahvaltı",
+  lunch: "Öğle",
+  dinner: "Akşam",
+  snack: "Atıştırma",
+};
+
 export default async function NutritionPage() {
   const user = await getCurrentUser();
-  const [meals, data] = await Promise.all([
+  const today = startOfDay(new Date());
+  const [meals, pastMeals, data] = await Promise.all([
     prisma.meal.findMany({
-      where: { userId: user.id, loggedAt: { gte: startOfDay(new Date()) } },
+      where: { userId: user.id, loggedAt: { gte: today } },
       orderBy: { loggedAt: "asc" },
+    }),
+    // Son 14 günün (bugün hariç) öğünleri → gün gün geçmiş
+    prisma.meal.findMany({
+      where: { userId: user.id, loggedAt: { gte: daysAgo(14), lt: today } },
+      orderBy: { loggedAt: "desc" },
     }),
     getDashboardData(user.id),
   ]);
@@ -29,6 +42,18 @@ export default async function NutritionPage() {
   const { consumed, target, macroTarget } = data;
   const remaining = Math.max(0, target - consumed.kcal);
 
+  // Geçmiş öğünleri güne göre grupla (yeni → eski).
+  const historyMap = new Map<string, { date: Date; meals: typeof pastMeals; kcal: number; protein: number }>();
+  for (const m of pastMeals) {
+    const key = startOfDay(m.loggedAt).toISOString();
+    const g = historyMap.get(key) ?? { date: startOfDay(m.loggedAt), meals: [], kcal: 0, protein: 0 };
+    g.meals.push(m);
+    g.kcal += m.totalKcal;
+    g.protein += m.proteinG;
+    historyMap.set(key, g);
+  }
+  const history = [...historyMap.values()];
+
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-bold tracking-tight">Beslenme</h1>
@@ -44,6 +69,42 @@ export default async function NutritionPage() {
       <div className="mt-5">
         <NutritionClient initialMeals={initialMeals} />
       </div>
+
+      {history.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold tracking-tight">Geçmiş günler</h2>
+          <p className="mt-0.5 text-sm text-ink-3">Son 14 günün öğün kayıtları ve günlük kalori toplamı.</p>
+          <div className="mt-3 flex flex-col gap-2.5">
+            {history.map((d) => (
+              <details key={d.date.toISOString()} className="card overflow-hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 hover:bg-surface-2">
+                  <div>
+                    <div className="text-sm font-semibold">
+                      {fmtDate(d.date, { weekday: "long", day: "numeric", month: "long" })}
+                    </div>
+                    <div className="text-xs text-ink-3">{d.meals.length} öğün · {fmt(d.protein)} g protein</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold tabular-nums">{fmt(d.kcal)}<span className="ml-1 text-xs font-medium text-ink-3">kcal</span></div>
+                    <div className="text-[0.7rem] text-ink-3">hedef {fmt(target)}</div>
+                  </div>
+                </summary>
+                <div className="border-t border-border">
+                  {d.meals.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 text-sm last:border-0">
+                      <div className="flex items-center gap-2">
+                        <span className="pill bg-surface-2 text-ink-3">{MEAL_LABEL[m.mealType] ?? m.mealType}</span>
+                        <span className="font-medium">{m.name}</span>
+                      </div>
+                      <span className="tabular-nums text-ink-2">{fmt(m.totalKcal)} kcal</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
