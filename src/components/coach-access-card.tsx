@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Copy, Check, UserPlus, Link2Off, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Copy, Check, UserPlus, Link2Off, ShieldCheck, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CoachInfo {
@@ -147,6 +148,13 @@ export function CoachAccessCard({
           )}
         </div>
       )}
+
+      <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+        <span className="text-xs text-ink-3">Kendin bir danışanın koçu musun?</span>
+        <Link href="/coach/join" className="inline-flex items-center gap-1 text-xs font-semibold text-primary-ink hover:underline">
+          Koç girişi (kod gir) <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
     </div>
   );
 }
