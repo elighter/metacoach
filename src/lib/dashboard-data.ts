@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeTdee, ewmaSeries, mifflinStJeor, type DailyPoint } from "@/lib/tdee";
-import { ageFromDob, startOfDay } from "@/lib/utils";
+import { ageFromDob, startOfDay, daysAgo } from "@/lib/utils";
 
 export interface ChartPoint {
   date: string; // ISO day
@@ -98,8 +98,8 @@ export async function getDashboardData(userId: string) {
     carb: Math.round((target - (latestBio?.weightKg ?? 80) * 2 * 4 - target * 0.28) / 4),
   };
 
-  // ── Workout: next session + weekly adherence ──
-  const [nextSession, completedThisWeek] = await Promise.all([
+  // ── Workout: next session + weekly adherence + recent (imported/completed) ──
+  const [nextSession, completedThisWeek, recentSessions, appleHealth] = await Promise.all([
     prisma.workoutSession.findFirst({
       where: { userId, scheduledFor: { gte: startOfDay(new Date()) }, status: { not: "completed" } },
       orderBy: { scheduledFor: "asc" },
@@ -108,6 +108,12 @@ export async function getDashboardData(userId: string) {
     prisma.workoutSession.count({
       where: { userId, status: "completed", completedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } },
     }),
+    prisma.workoutSession.findMany({
+      where: { userId, status: "completed", completedAt: { gte: daysAgo(14) } },
+      orderBy: { completedAt: "desc" },
+      take: 8,
+    }),
+    prisma.deviceConnection.findFirst({ where: { userId, provider: "apple_health" } }),
   ]);
   const workout = {
     hasSession: !!nextSession,
@@ -117,6 +123,34 @@ export async function getDashboardData(userId: string) {
     exerciseCount: nextSession?._count.sets ?? 0,
     completedThisWeek,
   };
+
+  // ── Aktivite (Apple Health / wearable) ──
+  const todayKey = startOfDay(new Date()).getTime();
+  const todayLog = logs.find((l) => startOfDay(l.date).getTime() === todayKey) ?? null;
+  const cutoff7 = daysAgo(7).getTime();
+  const last7 = logs.filter((l) => l.date.getTime() >= cutoff7);
+  const activeVals = last7.map((l) => l.activeKcal).filter((v) => v > 0);
+  const stepVals = last7.map((l) => l.steps).filter((v) => v > 0);
+  const activity = {
+    hasData: logs.some((l) => l.activeKcal > 0 || l.steps > 0),
+    todayActiveKcal: Math.round(todayLog?.activeKcal ?? 0),
+    todaySteps: todayLog?.steps ?? 0,
+    avgActiveKcal: activeVals.length ? Math.round(activeVals.reduce((s, v) => s + v, 0) / activeVals.length) : 0,
+    avgSteps: stepVals.length ? Math.round(stepVals.reduce((s, v) => s + v, 0) / stepVals.length) : 0,
+    series: logs.slice(-10).map((l) => Math.round(l.activeKcal ?? 0)),
+    lastSyncAt: appleHealth?.lastSyncAt ? appleHealth.lastSyncAt.toISOString() : null,
+    connected: appleHealth?.status === "connected",
+    autoCalibrated: user.activityAuto,
+  };
+  const recentWorkouts = recentSessions.map((s) => ({
+    id: s.id,
+    label: s.label,
+    dayType: s.dayType,
+    source: s.source,
+    completedAt: (s.completedAt ?? s.scheduledFor).toISOString(),
+    durationMin: s.durationMin,
+    estKcal: s.estKcal,
+  }));
 
   // Weight change over window
   const firstTrend = weightPts.length ? trendMap.get(startOfDay(weightPts[0].date).getTime()) : null;
@@ -141,6 +175,8 @@ export async function getDashboardData(userId: string) {
     weightDelta,
     goal: user.goal,
     workout,
+    activity,
+    recentWorkouts,
   };
 }
 

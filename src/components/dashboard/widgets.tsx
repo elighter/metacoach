@@ -7,6 +7,8 @@ import {
   Scale as ScaleIcon,
   Droplet,
   Activity,
+  Footprints,
+  Heart,
   Sparkles,
   Beef,
   Wheat,
@@ -157,6 +159,62 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
           spark={<Sparkline data={calSeries} color="var(--warn)" bars />}
         />
       );
+    case "activity": {
+      const a = data.activity;
+      const rw = data.recentWorkouts[0];
+      return (
+        <Panel
+          title="Aktivite"
+          sub="Apple Health · aktif kalori & adım"
+          right={
+            a.connected ? (
+              <span className="pill bg-good-wash text-good">Bağlı</span>
+            ) : (
+              <span className="pill bg-surface-2 text-ink-3">Bağlı değil</span>
+            )
+          }
+        >
+          {a.hasData ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border bg-surface-2 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-ink-3"><Flame className="h-3.5 w-3.5" /> Aktif kalori</div>
+                  <div className="mt-1 text-xl font-bold tabular-nums">{fmt(a.todayActiveKcal)}<span className="ml-1 text-xs font-medium text-ink-3">kcal</span></div>
+                  <div className="mt-0.5 text-[0.7rem] text-ink-3">7g ort. {fmt(a.avgActiveKcal)} kcal</div>
+                </div>
+                <div className="rounded-lg border border-border bg-surface-2 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-ink-3"><Footprints className="h-3.5 w-3.5" /> Adım</div>
+                  <div className="mt-1 text-xl font-bold tabular-nums">{fmt(a.todaySteps)}</div>
+                  <div className="mt-0.5 text-[0.7rem] text-ink-3">7g ort. {fmt(a.avgSteps)}</div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  {rw ? (
+                    <div className="truncate text-xs text-ink-2">
+                      <Heart className="mr-1 inline h-3 w-3 text-primary-ink" />
+                      Son: <b className="text-ink">{rw.label}</b>
+                      {rw.durationMin ? ` · ${rw.durationMin} dk` : ""}{rw.estKcal ? ` · ${fmt(rw.estKcal)} kcal` : ""}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-ink-3">Henüz antrenman yok</div>
+                  )}
+                  {a.autoCalibrated && (
+                    <div className="mt-1 text-[0.7rem] text-ink-3">Aktivite düzeyi otomatik kalibre ediliyor</div>
+                  )}
+                </div>
+                <Sparkline data={a.series} color="var(--good)" bars />
+              </div>
+            </>
+          ) : (
+            <div className="py-6 text-center">
+              <p className="text-sm text-ink-3">Apple Health verisi henüz yok.</p>
+              <a href="/settings" className="mt-1 inline-block text-xs font-semibold text-primary-ink">Aktivite senkronunu kur →</a>
+            </div>
+          )}
+        </Panel>
+      );
+    }
     case "weeklyBalance": {
       const week = chart.filter((c) => c.calories != null).slice(-7).map((c) => ({
         label: c.label,
@@ -278,6 +336,11 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
             <span className="pill bg-surface-2 text-ink-2">ρ = {fmt(tdee.rhoUsed)} kcal/kg</span>
             <span className="pill bg-surface-2 text-ink-2">{tdee.nDaysWithCalories} gün kayıt</span>
             <span className="pill bg-surface-2 text-ink-2">trend {fmt(tdee.weightSlopeKgPerWeek, 2)} kg/hafta</span>
+            {data.activity.hasData && (
+              <span className="pill bg-primary-wash text-primary-ink" title="Apple Health aktivitesinden otomatik ayarlandı">
+                aktivite: {data.user.activityBase} · Apple Health
+              </span>
+            )}
           </div>
         </Panel>
       );
