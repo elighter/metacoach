@@ -322,6 +322,51 @@ async function main() {
     data: { userId: user.id, provider: "apple_health", status: "connected", lastSyncAt: new Date() },
   });
 
+  // ── Demo koç + Emre'ye bağlantı + örnek plan/yorum ──────────────────────
+  const coachEmail = "coach@metacoach.app";
+  await prisma.user.deleteMany({ where: { email: coachEmail } });
+  const coach = await prisma.user.create({
+    data: {
+      name: "Koç Deniz",
+      email: coachEmail,
+      passwordHash: await bcrypt.hash("metacoach123", 10),
+      role: "coach",
+      disclaimerAt: new Date(),
+    },
+  });
+  await prisma.coachInvite.create({ data: { clientId: user.id, code: "EMRE123456" } });
+  await prisma.coachLink.create({
+    data: {
+      coachId: coach.id,
+      clientId: user.id,
+      status: "active",
+      permissions: JSON.stringify(["activity", "workout", "nutrition", "metabolism", "assessment"]),
+    },
+  });
+  await prisma.trainingPlan.create({
+    data: {
+      clientId: user.id,
+      coachId: coach.id,
+      title: "Hafta 1 — Bazal kuvvet + kardiyo",
+      body:
+        "Pzt: Üst vücut kuvvet (5x5 bench, row, ohp)\n" +
+        "Sal: 40 dk tempolu yürüyüş/kardiyo\n" +
+        "Çar: Alt vücut (squat, RDL, lunge)\n" +
+        "Per: Dinlenme / esneme\n" +
+        "Cum: Full body + core\n" +
+        "Not: Antrenman günleri protein 2.0 g/kg. Uyku 7 saat altına düşmesin.",
+      active: true,
+    },
+  });
+  await prisma.coachComment.create({
+    data: {
+      clientId: user.id,
+      coachId: coach.id,
+      authorRole: "coach",
+      body: "Merhaba Emre, ilk hafta planını yükledim. Kardiyo günlerinde nabzını 130-150 aralığında tut. Sorunu buradan yazabilirsin.",
+    },
+  });
+
   console.log(`✓ Seeded user ${user.email} with ${DAYS} days of history + ${exercises.length} exercises & a 3-day program.`);
 }
 

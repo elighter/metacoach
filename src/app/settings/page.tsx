@@ -1,15 +1,18 @@
 import { getCurrentUser, prisma } from "@/lib/db";
 import { SettingsForm } from "@/components/settings-form";
+import { CoachAccessCard } from "@/components/coach-access-card";
+import { getClientCoachInfo, COACH_MODULES } from "@/lib/coach";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();
-  const [settings, devices, consents, healthToken] = await Promise.all([
+  const [settings, devices, consents, healthToken, coachInfo] = await Promise.all([
     prisma.settings.findUnique({ where: { userId: user.id } }),
     prisma.deviceConnection.findMany({ where: { userId: user.id } }),
     prisma.consent.findMany({ where: { userId: user.id, revokedAt: null } }),
     prisma.healthIngestToken.findUnique({ where: { userId: user.id } }),
+    getClientCoachInfo(user.id),
   ]);
   const appleHealthSync = devices.find((d) => d.provider === "apple_health");
 
@@ -41,6 +44,15 @@ export default async function SettingsPage() {
             lastSyncAt: appleHealthSync?.lastSyncAt ? appleHealthSync.lastSyncAt.toISOString() : null,
           }}
         />
+
+        <div className="mt-5">
+          <CoachAccessCard
+            initialInviteCode={coachInfo.inviteCode}
+            coach={coachInfo.coach ? { name: coachInfo.coach.name, email: coachInfo.coach.email } : null}
+            initialPermissions={coachInfo.permissions}
+            modules={COACH_MODULES.map((m) => ({ id: m.id, label: m.label }))}
+          />
+        </div>
       </div>
     </div>
   );

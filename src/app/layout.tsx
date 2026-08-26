@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/app-shell";
 import { PwaRegister } from "@/components/pwa-register";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: "MetaCoach — Adaptif Sağlık & Beslenme",
@@ -25,9 +26,16 @@ const noFlash = `(function(){try{var t=localStorage.getItem('mc-theme')||'system
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  const user = session?.user
-    ? { name: session.user.name ?? "Kullanıcı", email: session.user.email ?? "" }
-    : null;
+  let user: { name: string; email: string; role: string } | null = null;
+  if (session?.user?.email) {
+    const dbUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { name: true, email: true, role: true },
+    });
+    user = dbUser
+      ? { name: dbUser.name, email: dbUser.email, role: dbUser.role }
+      : { name: session.user.name ?? "Kullanıcı", email: session.user.email, role: "user" };
+  }
   return (
     <html lang="tr" suppressHydrationWarning>
       <head>
