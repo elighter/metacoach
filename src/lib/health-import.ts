@@ -55,15 +55,36 @@ function num(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Apple/HAE workout tipini uygulamanın dayType + Türkçe etiketine eşle. */
-function mapWorkoutType(raw: string): { dayType: string; label: string } {
+// HAE enerjiyi genelde kJ (kilojoule) gönderir; sistemimiz kcal ile çalışır.
+const KJ_PER_KCAL = 4.184;
+function toKcal(qty: number | undefined, units: unknown): number | undefined {
+  if (qty === undefined) return undefined;
+  const u = String(units ?? "").toLowerCase();
+  if (u === "kj" || u === "kilojoules" || u === "kjoule" || u === "kilojoule") return qty / KJ_PER_KCAL;
+  return qty; // kcal / Cal / cal / bilinmeyen → kcal varsay
+}
+
+/** {qty,units} ya da düz sayı olabilen enerji alanından kcal çıkar. */
+function energyKcal(field: unknown): number | undefined {
+  if (field && typeof field === "object") {
+    const o = field as Record<string, unknown>;
+    return toKcal(num(o.qty), o.units);
+  }
+  return num(field);
+}
+
+/**
+ * Workout tipini dayType'a eşle (TR + EN anahtar kelimeler). Etiket olarak
+ * cihazın verdiği özgün ad kullanılır (ör. "Açık Hava Yürüyüş").
+ */
+function mapWorkoutDayType(raw: string): string {
   const t = raw.toLowerCase();
-  if (/(strength|weight|functional)/.test(t)) return { dayType: "strength", label: "Kuvvet" };
-  if (/(run|walk|hik|cycl|bik|row|elliptical|stair|cardio|swim)/.test(t))
-    return { dayType: "cardio", label: "Kardiyo" };
-  if (/(hiit|interval|core|pilates|yoga|mobility)/.test(t))
-    return { dayType: "functional", label: "Fonksiyonel" };
-  return { dayType: "functional", label: raw || "Antrenman" };
+  if (/(kuvvet|ağırlık|strength|weight)/.test(t)) return "strength";
+  if (/(yürü|koş|kardiyo|bisiklet|eliptik|yüz|merdiven|koşu band|walk|run|hik|cycl|bik|row|elliptical|stair|cardio|swim)/.test(t))
+    return "cardio";
+  if (/(hiit|interval|core|pilates|yoga|esneme|mobilite|mobility|fonksiyonel|functional)/.test(t))
+    return "functional";
+  return "functional";
 }
 
 // ── Normalizasyon (saf) ─────────────────────────────────────────────────────
@@ -89,10 +110,12 @@ function normalizeHealthAutoExport(data: Record<string, unknown>): NormalizedHea
     const name = String(metric?.name ?? "").toLowerCase();
     const field = METRIC_ALIASES[name];
     if (!field) continue;
+    const units = metric.units; // ör. active_energy → "kJ"
     const points = Array.isArray(metric.data) ? metric.data : [];
     for (const p of points as Record<string, unknown>[]) {
       const key = toDayKey(p?.date);
-      const qty = num(p?.qty ?? p?.value);
+      let qty = num(p?.qty ?? p?.value);
+      if (field === "activeKcal") qty = toKcal(qty, units); // kJ → kcal
       if (key && qty !== undefined) put(key, field, qty);
     }
   }
@@ -103,18 +126,25 @@ function normalizeHealthAutoExport(data: Record<string, unknown>): NormalizedHea
     const start = toIso(w?.start ?? w?.startDate);
     if (!start) continue;
     const rawType = String(w?.name ?? w?.workoutActivityType ?? "Antrenman");
-    const { dayType, label } = mapWorkoutType(rawType);
+    const dayType = mapWorkoutDayType(rawType);
     const end = toIso(w?.end ?? w?.endDate);
-    const durationMin =
-      num((w?.duration as Record<string, unknown>)?.qty ?? w?.duration) ??
-      (end ? Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000) : 0);
-    const energy = (w?.totalEnergy ?? w?.activeEnergy) as Record<string, unknown> | undefined;
-    const kcal = num(energy?.qty ?? w?.totalEnergyBurned ?? w?.activeEnergyBurned);
-    const dist = (w?.distance as Record<string, unknown>) ?? undefined;
+    // HAE duration = saniye (düz sayı). En güvenilir kaynak start–end farkı.
+    const durationMin = end
+      ? (new Date(end).getTime() - new Date(start).getTime()) / 60000
+      : typeof w?.duration === "number"
+        ? (w.duration as number) / 60
+        : num((w?.duration as Record<string, unknown>)?.qty) ?? 0;
+    // Aktif enerji (bazal hariç) tercih; yoksa toplam. kJ→kcal çevrilir.
+    const kcal =
+      energyKcal(w?.activeEnergyBurned) ??
+      energyKcal(w?.activeEnergy) ??
+      energyKcal(w?.totalEnergy) ??
+      energyKcal(w?.totalEnergyBurned);
+    const dist = w?.distance as Record<string, unknown> | null | undefined;
     const distKm = num(dist?.qty ?? w?.totalDistance);
     workouts.push({
       type: rawType,
-      label,
+      label: rawType, // cihazın verdiği özgün ad
       dayType,
       start,
       durationMin: Math.max(0, Math.round(durationMin)),
@@ -145,11 +175,10 @@ function normalizeGeneric(payload: Record<string, unknown>): NormalizedHealth {
     const start = toIso(w?.start);
     if (!start) continue;
     const rawType = String(w?.type ?? "Antrenman");
-    const { dayType, label } = mapWorkoutType(rawType);
     workouts.push({
       type: rawType,
-      label,
-      dayType,
+      label: rawType,
+      dayType: mapWorkoutDayType(rawType),
       start,
       durationMin: Math.max(0, Math.round(num(w?.durationMin) ?? 0)),
       kcal: num(w?.kcal) !== undefined ? Math.round(num(w?.kcal)!) : undefined,
