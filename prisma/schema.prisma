@@ -21,6 +21,7 @@ model User {
   heightCm     Float?
   activityBase String    @default("moderate") // sedentary|light|moderate|active|athlete
   activityAuto Boolean   @default(true)        // activityBase'i wearable aktivitesinden otomatik kalibre et
+  role         String    @default("user")      // user | coach
   goal         String    @default("maintain") // cut | maintain | bulk
   unitPref     String    @default("metric")   // metric | imperial
   locale       String    @default("tr")
@@ -44,6 +45,14 @@ model User {
   workoutSessions     WorkoutSession[]
   coachAssessment     CoachAssessment?
   healthIngestToken   HealthIngestToken?
+
+  coachLinksAsCoach   CoachLink[]    @relation("CoachLinkCoach")
+  coachLinksAsClient  CoachLink[]    @relation("CoachLinkClient")
+  coachInvite         CoachInvite?   @relation("CoachInviteClient")
+  plansAsClient       TrainingPlan[] @relation("TrainingPlanClient")
+  plansAsCoach        TrainingPlan[] @relation("TrainingPlanCoach")
+  commentsAsClient    CoachComment[] @relation("CoachCommentClient")
+  commentsAsCoach     CoachComment[] @relation("CoachCommentCoach")
 }
 
 model FileAsset {
@@ -330,4 +339,56 @@ model HealthIngestToken {
   token      String    @unique
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
+}
+
+// ── Koç / PT (hafif MVP) ───────────────────────────────────────────────────
+// Danışan bir koçu davet koduyla bağlar; hangi modülleri göreceğini kendi seçer.
+// Koç plan (TrainingPlan) ve yorum (CoachComment) girer; ikisi de aynı User
+// tablosundan (role = "coach").
+
+// Danışan başına tek davet kodu; koç bunu girerek bağlanır.
+model CoachInvite {
+  id        String   @id @default(cuid())
+  clientId  String   @unique
+  client    User     @relation("CoachInviteClient", fields: [clientId], references: [id], onDelete: Cascade)
+  code      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model CoachLink {
+  id          String   @id @default(cuid())
+  coachId     String
+  coach       User     @relation("CoachLinkCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      User     @relation("CoachLinkClient", fields: [clientId], references: [id], onDelete: Cascade)
+  status      String   @default("active") // active | revoked
+  permissions String   @default("[]")     // JSON: izinli modüller ["workout","activity",...]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([coachId, clientId])
+}
+
+model TrainingPlan {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    User     @relation("TrainingPlanClient", fields: [clientId], references: [id], onDelete: Cascade)
+  coachId   String
+  coach     User     @relation("TrainingPlanCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CoachComment {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     User     @relation("CoachCommentClient", fields: [clientId], references: [id], onDelete: Cascade)
+  coachId    String
+  coach      User     @relation("CoachCommentCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  authorRole String   // coach | client
+  body       String
+  createdAt  DateTime @default(now())
 }

@@ -12,6 +12,8 @@ import {
   Dumbbell,
   Gauge,
   ClipboardList,
+  Users,
+  NotebookText,
   User,
   Settings,
   Menu,
@@ -93,7 +95,13 @@ function NavItemLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => v
   );
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ onNavigate, role }: { onNavigate?: () => void; role: string }) {
+  // Role'e göre: koç → "Koçluk", danışan → "Planım" (Hesap grubunun başında).
+  const roleItem: NavItem =
+    role === "coach"
+      ? { href: "/coach", label: "Koçluk", icon: Users }
+      : { href: "/plan", label: "Planım", icon: NotebookText };
+  const secondary = [roleItem, ...NAV_SECONDARY];
   return (
     <nav className="flex flex-col gap-1">
       {NAV_PRIMARY.map((item) => (
@@ -102,7 +110,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       <div className="mt-3 px-3 pb-1 pt-2 text-[0.6rem] font-semibold uppercase tracking-[0.12em] text-ink-3">
         Hesap
       </div>
-      {NAV_SECONDARY.map((item) => (
+      {secondary.map((item) => (
         <NavItemLink key={item.href} item={item} onNavigate={onNavigate} />
       ))}
     </nav>
@@ -128,8 +136,9 @@ export function AppShell({
   user,
 }: {
   children: React.ReactNode;
-  user: { name: string; email: string } | null;
+  user: { name: string; email: string; role?: string } | null;
 }) {
+  const role = user?.role ?? "user";
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const onboarding = useOnboarding();
@@ -144,7 +153,7 @@ export function AppShell({
       {/* Sidebar — desktop */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col gap-6 border-r border-border bg-surface px-3 py-5 lg:flex">
         <Brand />
-        <NavLinks />
+        <NavLinks role={role} />
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-2 transition-colors hover:bg-surface-2 hover:text-crit"
@@ -164,7 +173,7 @@ export function AppShell({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <NavLinks onNavigate={() => setOpen(false)} />
+            <NavLinks role={role} onNavigate={() => setOpen(false)} />
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="mt-auto flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-ink-2 hover:bg-surface-2 hover:text-crit"
