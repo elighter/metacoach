@@ -6,11 +6,19 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Activity, Loader2 } from "lucide-react";
 
-/** Yalnızca site içi (path) callbackUrl'e izin ver; açık yönlendirmeyi engelle. */
+/** Site içi callbackUrl'e izin ver (göreli path VEYA aynı-origin tam URL). */
 function safeCallback(): string {
   if (typeof window === "undefined") return "/";
-  const cb = new URLSearchParams(window.location.search).get("callbackUrl");
-  return cb && cb.startsWith("/") && !cb.startsWith("//") ? cb : "/";
+  const raw = new URLSearchParams(window.location.search).get("callbackUrl");
+  if (!raw) return "/";
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (u.origin === window.location.origin) return u.pathname + u.search;
+  } catch {
+    /* geçersiz URL */
+  }
+  return "/";
 }
 
 export default function LoginPage() {
@@ -21,7 +29,11 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [cb, setCb] = useState("/");
 
-  useEffect(() => setCb(safeCallback()), []);
+  useEffect(() => {
+    const c = safeCallback();
+    setCb(c);
+    if (c.startsWith("/coach")) setEmail(""); // koç kendi hesabıyla girsin (demo e-postasını temizle)
+  }, []);
   const isCoachFlow = cb.startsWith("/coach");
   const registerHref = cb === "/" ? "/register" : `/register?callbackUrl=${encodeURIComponent(cb)}`;
 
@@ -77,9 +89,11 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <p className="mt-4 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-center text-xs text-ink-3">
-          Demo giriş: <span className="font-mono">emrecakmak@me.com</span> / <span className="font-mono">metacoach123</span>
-        </p>
+        {!isCoachFlow && (
+          <p className="mt-4 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-center text-xs text-ink-3">
+            Demo giriş: <span className="font-mono">emrecakmak@me.com</span> / <span className="font-mono">metacoach123</span>
+          </p>
+        )}
       </div>
     </div>
   );
