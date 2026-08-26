@@ -31,16 +31,23 @@ export function serializePermissions(mods: string[]): string {
   return JSON.stringify(mods.filter((m) => MODULE_IDS.includes(m)));
 }
 
-/** Danışanın davet kodunu getirir; yoksa oluşturur. */
-export async function ensureInviteCode(clientId: string): Promise<string> {
+/**
+ * Danışanın davet kodunu getirir/oluşturur ve önden seçilen izinleri kaydeder.
+ * Kod korunur (link sabit kalsın); yalnızca izinler güncellenir.
+ */
+export async function upsertInvite(clientId: string, permissions: string[]): Promise<string> {
+  const perms = serializePermissions(permissions);
   const existing = await prisma.coachInvite.findUnique({ where: { clientId } });
-  if (existing) return existing.code;
-  const code = randomBytes(5).toString("hex").toUpperCase(); // 10 haneli
-  const created = await prisma.coachInvite.create({ data: { clientId, code } });
+  if (existing) {
+    await prisma.coachInvite.update({ where: { clientId }, data: { permissions: perms } });
+    return existing.code;
+  }
+  const code = randomBytes(6).toString("base64url"); // ~8 karakter, URL-güvenli
+  const created = await prisma.coachInvite.create({ data: { clientId, code, permissions: perms } });
   return created.code;
 }
 
-/** Danışan tarafı: bağlı koç + izinler + davet kodu. */
+/** Danışan tarafı: bağlı koç + izinler + davet kodu/önden seçili izinler. */
 export async function getClientCoachInfo(clientId: string) {
   const [link, invite] = await Promise.all([
     prisma.coachLink.findFirst({
@@ -54,6 +61,7 @@ export async function getClientCoachInfo(clientId: string) {
     permissions: link ? parsePermissions(link.permissions) : [],
     linkId: link?.id ?? null,
     inviteCode: invite?.code ?? null,
+    invitePermissions: invite ? parsePermissions(invite.permissions) : [],
   };
 }
 

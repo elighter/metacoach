@@ -24,12 +24,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Kendini koç olarak ekleyemezsin." }, { status: 400 });
   }
 
+  // Davetle önden seçilen izinlerle bağlan (danışan sonradan değiştirebilir).
   await prisma.$transaction([
     prisma.user.update({ where: { id: user.id }, data: { role: "coach" } }),
     prisma.coachLink.upsert({
       where: { coachId_clientId: { coachId: user.id, clientId: invite.clientId } },
-      create: { coachId: user.id, clientId: invite.clientId, status: "active", permissions: "[]" },
-      update: { status: "active" },
+      create: { coachId: user.id, clientId: invite.clientId, status: "active", permissions: invite.permissions },
+      update: { status: "active", permissions: invite.permissions },
     }),
   ]);
 

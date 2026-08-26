@@ -47,9 +47,10 @@ export default async function SettingsPage() {
 
         <div className="mt-5">
           <CoachAccessCard
+            linkedCoach={coachInfo.coach ? { name: coachInfo.coach.name, email: coachInfo.coach.email } : null}
+            initialLinkPermissions={coachInfo.permissions}
+            initialInvitePermissions={coachInfo.invitePermissions}
             initialInviteCode={coachInfo.inviteCode}
-            coach={coachInfo.coach ? { name: coachInfo.coach.name, email: coachInfo.coach.email } : null}
-            initialPermissions={coachInfo.permissions}
             modules={COACH_MODULES.map((m) => ({ id: m.id, label: m.label }))}
           />
         </div>
