@@ -42,7 +42,8 @@ export async function upsertInvite(clientId: string, permissions: string[]): Pro
     await prisma.coachInvite.update({ where: { clientId }, data: { permissions: perms } });
     return existing.code;
   }
-  const code = randomBytes(6).toString("base64url"); // ~8 karakter, URL-güvenli
+  // Büyük harf hex: URL-güvenli + büyük/küçük harf duyarsız (join .toUpperCase() ile tutarlı).
+  const code = randomBytes(5).toString("hex").toUpperCase(); // 10 karakter
   const created = await prisma.coachInvite.create({ data: { clientId, code, permissions: perms } });
   return created.code;
 }

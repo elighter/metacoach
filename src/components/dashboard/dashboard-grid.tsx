@@ -135,7 +135,7 @@ export function DashboardGrid({
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Günaydın, Emre 👋</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Günaydın, {data.user.name.trim().split(" ")[0]} 👋</h1>
           <p className="text-sm text-ink-3">
             {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" })} · Metabolizman{" "}
             <b className="text-good">öğreniliyor</b> — {data.tdee.nDaysWithCalories} günlük veri
