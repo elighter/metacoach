@@ -170,11 +170,19 @@ export function CoachAccessCard({
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
-        <span className="text-xs text-ink-3">Kendin bir danışanın koçu musun?</span>
-        <Link href="/coach/join" className="inline-flex items-center gap-1 text-xs font-semibold text-primary-ink hover:underline">
-          Koç girişi (kod gir) <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+      <div className="mt-4 flex flex-col gap-1.5 border-t border-border pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-ink-3">Kendin bir danışanın koçu musun?</span>
+          <Link href="/coach/join" className="inline-flex items-center gap-1 text-xs font-semibold text-primary-ink hover:underline">
+            Koç girişi (kod gir) <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-ink-3">Koç deneyimini denemek ister misin?</span>
+          <Link href="/coach/preview" className="inline-flex items-center gap-1 text-xs font-semibold text-primary-ink hover:underline">
+            Koç önizleme (kaydetmez) <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
     </div>
   );
