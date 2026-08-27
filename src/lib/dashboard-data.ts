@@ -8,6 +8,7 @@ export interface ChartPoint {
   weight: number | null;
   trend: number | null;
   calories: number | null;
+  burned: number | null; // günlük yakılan (Apple bazal + aktif); veri yoksa null
 }
 
 export async function getDashboardData(userId: string) {
@@ -45,13 +46,29 @@ export async function getDashboardData(userId: string) {
   const trendMap = new Map(
     ewmaSeries(weightPts).map((t) => [startOfDay(t.date).getTime(), t.trend]),
   );
-  const chart: ChartPoint[] = logs.map((l) => ({
-    date: l.date.toISOString(),
-    label: l.date.toLocaleDateString("tr-TR", { day: "numeric", month: "short" }),
-    weight: l.weightTrend,
-    trend: trendMap.get(startOfDay(l.date).getTime()) ?? null,
-    calories: l.caloriesIn > 0 ? l.caloriesIn : null,
-  }));
+  // Dinlenme (bazal) BMR — Apple bazalı olmayan günler için yedek (Katch-McArdle).
+  const wKgForBmr = latestBio?.weightKg ?? 80;
+  const bfForBmr = latestBio?.bodyFatPct ?? null;
+  const lbmForBmr =
+    bfForBmr != null
+      ? wKgForBmr * (1 - bfForBmr / 100)
+      : user.sex === "female"
+        ? 0.252 * wKgForBmr + 0.473 * (user.heightCm ?? 165) - 48.3
+        : 0.407 * wKgForBmr + 0.267 * (user.heightCm ?? 175) - 19.2;
+  const fallbackBmr = Math.round(370 + 21.6 * lbmForBmr);
+
+  const chart: ChartPoint[] = logs.map((l) => {
+    const hasActivity = l.basalKcal != null || l.activeKcal > 0;
+    const burned = hasActivity ? Math.round((l.basalKcal ?? fallbackBmr) + l.activeKcal) : null;
+    return {
+      date: l.date.toISOString(),
+      label: l.date.toLocaleDateString("tr-TR", { day: "numeric", month: "short" }),
+      weight: l.weightTrend,
+      trend: trendMap.get(startOfDay(l.date).getTime()) ?? null,
+      calories: l.caloriesIn > 0 ? l.caloriesIn : null,
+      burned,
+    };
+  });
 
   // ── Dynamic TDEE ──
   const days: DailyPoint[] = logs.map((l) => ({

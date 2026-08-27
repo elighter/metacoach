@@ -15,6 +15,7 @@ import { startOfDay } from "@/lib/utils";
 export interface NormalizedDay {
   date: string; // YYYY-MM-DD (yerel gün)
   activeKcal?: number;
+  basalKcal?: number;
   steps?: number;
 }
 export interface NormalizedWorkout {
@@ -89,17 +90,22 @@ function mapWorkoutDayType(raw: string): string {
 
 // ── Normalizasyon (saf) ─────────────────────────────────────────────────────
 
-const METRIC_ALIASES: Record<string, "activeKcal" | "steps"> = {
+type DayField = "activeKcal" | "basalKcal" | "steps";
+const ENERGY_FIELDS: DayField[] = ["activeKcal", "basalKcal"];
+const METRIC_ALIASES: Record<string, DayField> = {
   active_energy: "activeKcal",
   active_energy_burned: "activeKcal",
   activeenergyburned: "activeKcal",
+  basal_energy_burned: "basalKcal",
+  basal_energy: "basalKcal",
+  resting_energy: "basalKcal",
   step_count: "steps",
   steps: "steps",
 };
 
 function normalizeHealthAutoExport(data: Record<string, unknown>): NormalizedHealth {
   const dayMap = new Map<string, NormalizedDay>();
-  const put = (dateKey: string, field: "activeKcal" | "steps", qty: number) => {
+  const put = (dateKey: string, field: DayField, qty: number) => {
     const d = dayMap.get(dateKey) ?? { date: dateKey };
     d[field] = (d[field] ?? 0) + qty; // aynı gün birden çok örnek → topla
     dayMap.set(dateKey, d);
@@ -110,12 +116,12 @@ function normalizeHealthAutoExport(data: Record<string, unknown>): NormalizedHea
     const name = String(metric?.name ?? "").toLowerCase();
     const field = METRIC_ALIASES[name];
     if (!field) continue;
-    const units = metric.units; // ör. active_energy → "kJ"
+    const units = metric.units; // ör. active/basal_energy → "kJ"
     const points = Array.isArray(metric.data) ? metric.data : [];
     for (const p of points as Record<string, unknown>[]) {
       const key = toDayKey(p?.date);
       let qty = num(p?.qty ?? p?.value);
-      if (field === "activeKcal") qty = toKcal(qty, units); // kJ → kcal
+      if (ENERGY_FIELDS.includes(field)) qty = toKcal(qty, units); // kJ → kcal
       if (key && qty !== undefined) put(key, field, qty);
     }
   }
@@ -222,10 +228,11 @@ export async function applyHealthImport(
 ): Promise<ImportResult> {
   let daysWritten = 0;
   for (const d of n.days) {
-    if (d.activeKcal === undefined && d.steps === undefined) continue;
+    if (d.activeKcal === undefined && d.basalKcal === undefined && d.steps === undefined) continue;
     const day = startOfDay(new Date(`${d.date}T00:00:00`));
-    const patch: { activeKcal?: number; steps?: number } = {};
+    const patch: { activeKcal?: number; basalKcal?: number; steps?: number } = {};
     if (d.activeKcal !== undefined) patch.activeKcal = Math.round(d.activeKcal);
+    if (d.basalKcal !== undefined) patch.basalKcal = Math.round(d.basalKcal);
     if (d.steps !== undefined) patch.steps = Math.round(d.steps);
     await prisma.dailyLog.upsert({
       where: { userId_date: { userId, date: day } },

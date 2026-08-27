@@ -216,25 +216,26 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
       );
     }
     case "weeklyBalance": {
-      const week = chart.filter((c) => c.calories != null).slice(-7).map((c) => ({
-        label: c.label,
-        intake: c.calories as number,
-      }));
-      const days = week.filter((d) => d.intake > 0);
-      const avgIntake = days.length ? Math.round(days.reduce((s, d) => s + d.intake, 0) / days.length) : 0;
-      const avgBalance = avgIntake > 0 ? avgIntake - tdee.tdee : 0;
+      const week = chart.slice(-7).map((c) => ({ label: c.label, intake: c.calories, burned: c.burned }));
+      // Ortalama denge: hem alınan hem yakılan verisi olan günlerden.
+      const bothDays = week.filter((d) => d.intake != null && d.burned != null) as { intake: number; burned: number }[];
+      const avgBalance = bothDays.length
+        ? Math.round(bothDays.reduce((s, d) => s + (d.intake - d.burned), 0) / bothDays.length)
+        : null;
       return (
         <Panel
           title="Haftalık kalori dengesi"
-          sub="Günlük alınan · yakılan (TDEE) çizgisi"
+          sub="Alınan (bar) · yakılan (çizgi, Apple bazal+aktif)"
           right={
-            <span className={cn("pill", avgBalance <= 0 ? "bg-good-wash text-good" : "bg-warn-wash text-warn")}>
-              {avgBalance <= 0 ? "" : "+"}{fmt(avgBalance)} kcal/gün ort.
-            </span>
+            avgBalance != null ? (
+              <span className={cn("pill", avgBalance <= 0 ? "bg-good-wash text-good" : "bg-warn-wash text-warn")}>
+                {avgBalance <= 0 ? "" : "+"}{fmt(avgBalance)} kcal/gün ort.
+              </span>
+            ) : null
           }
         >
           {week.length >= 2 ? (
-            <CalorieBalanceChart data={week} tdee={tdee.tdee} />
+            <CalorieBalanceChart data={week} />
           ) : (
             <p className="py-8 text-center text-sm text-ink-3">Trend için en az 2 günlük kayıt gerekli.</p>
           )}
