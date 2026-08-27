@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/db";
 import { getCoachClients, COACH_MODULES } from "@/lib/coach";
 import { ChevronRight, Users } from "lucide-react";
@@ -10,6 +11,8 @@ const MODULE_LABEL = Object.fromEntries(COACH_MODULES.map((m) => [m.id, m.label]
 export default async function CoachPage() {
   const user = await getCurrentUser();
   const clients = await getCoachClients(user.id);
+  // Tek danışan varsa doğrudan onun paneline düş.
+  if (clients.length === 1) redirect(`/coach/${clients[0].client.id}`);
 
   return (
     <div className="mx-auto max-w-3xl">

@@ -47,6 +47,11 @@ const NAV_SECONDARY = [
   { href: "/profile", label: "Profil", icon: User },
   { href: "/settings", label: "Ayarlar", icon: Settings },
 ];
+// Koç sade menüsü: yalnızca danışan(lar) + hesap ayarları.
+const NAV_COACH = [
+  { href: "/coach", label: "Danışanlar", icon: Users },
+  { href: "/settings", label: "Ayarlar", icon: Settings },
+];
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -96,12 +101,18 @@ function NavItemLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => v
 }
 
 function NavLinks({ onNavigate, role }: { onNavigate?: () => void; role: string }) {
-  // Role'e göre: koç → "Koçluk", danışan → "Planım" (Hesap grubunun başında).
-  const roleItem: NavItem =
-    role === "coach"
-      ? { href: "/coach", label: "Koçluk", icon: Users }
-      : { href: "/plan", label: "Planım", icon: NotebookText };
-  const secondary = [roleItem, ...NAV_SECONDARY];
+  // Koç: sade, danışan-odaklı menü (kullanıcı ekranları gizli).
+  if (role === "coach") {
+    return (
+      <nav className="flex flex-col gap-1">
+        {NAV_COACH.map((item) => (
+          <NavItemLink key={item.href} item={item} onNavigate={onNavigate} />
+        ))}
+      </nav>
+    );
+  }
+  // Danışan: günlük ekranlar + "Hesap" grubu ("Planım" başta).
+  const secondary = [{ href: "/plan", label: "Planım", icon: NotebookText } as NavItem, ...NAV_SECONDARY];
   return (
     <nav className="flex flex-col gap-1">
       {NAV_PRIMARY.map((item) => (
