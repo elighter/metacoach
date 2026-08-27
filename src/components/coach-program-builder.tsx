@@ -1,9 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Check, Plus, Trash2, ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
 import { EXERCISE_LIBRARY, PHASE_LABEL, type Phase } from "@/lib/workout-library";
+
+export interface BuiltExercise {
+  slug: string;
+  targetSets: number;
+  targetReps: string;
+}
+export interface BuiltSession {
+  date: string;
+  label: string;
+  dayType: string;
+  exercises: BuiltExercise[];
+}
 
 interface ExRow {
   slug: string;
@@ -45,7 +57,13 @@ function emptyWeek(): DayState[] {
   return DAY_LONG.map((label) => ({ label, dayType: "strength", exercises: [] }));
 }
 
-export function CoachProgramBuilder({ clientId }: { clientId: string }) {
+export function CoachProgramBuilder({
+  clientId,
+  onPreview,
+}: {
+  clientId: string;
+  onPreview?: (sessions: BuiltSession[]) => void; // verilirse: kaydetmez, canlı önizleme yayar
+}) {
   const router = useRouter();
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [days, setDays] = useState<DayState[]>(emptyWeek);
@@ -56,6 +74,19 @@ export function CoachProgramBuilder({ clientId }: { clientId: string }) {
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
   const day = days[sel];
   const totalExercises = days.reduce((s, d) => s + d.exercises.length, 0);
+
+  // Kurulmuş seansları hesapla (submit ve canlı önizleme aynı biçimi kullanır).
+  const built: BuiltSession[] = useMemo(
+    () =>
+      days
+        .map((d, i) => ({ d, date: ymd(addDays(weekStart, i)) }))
+        .filter(({ d }) => d.exercises.length > 0)
+        .map(({ d, date }) => ({ date, label: d.label, dayType: d.dayType, exercises: d.exercises })),
+    [days, weekStart],
+  );
+  useEffect(() => {
+    if (onPreview) onPreview(built);
+  }, [built, onPreview]);
 
   function update(patch: Partial<DayState>) {
     setDays((ds) => ds.map((d, i) => (i === sel ? { ...d, ...patch } : d)));
@@ -76,11 +107,7 @@ export function CoachProgramBuilder({ clientId }: { clientId: string }) {
   }
 
   async function submit() {
-    const sessions = days
-      .map((d, i) => ({ d, date: ymd(addDays(weekStart, i)) }))
-      .filter(({ d }) => d.exercises.length > 0)
-      .map(({ d, date }) => ({ date, label: d.label, dayType: d.dayType, exercises: d.exercises }));
-    if (sessions.length === 0) {
+    if (built.length === 0) {
       setError("En az bir güne hareket ekle.");
       return;
     }
@@ -89,7 +116,7 @@ export function CoachProgramBuilder({ clientId }: { clientId: string }) {
     const res = await fetch("/api/coach/program", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, sessions }),
+      body: JSON.stringify({ clientId, sessions: built }),
     });
     if (res.ok) {
       setState("saved");
@@ -174,14 +201,18 @@ export function CoachProgramBuilder({ clientId }: { clientId: string }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button className="btn btn-primary" onClick={submit} disabled={state === "saving" || totalExercises === 0}>
-          {state === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "saved" ? <Check className="h-4 w-4" /> : <Dumbbell className="h-4 w-4" />}
-          {state === "saved" ? "Gönderildi" : `Programı gönder (${totalExercises} hareket)`}
-        </button>
-        {error && <span className="text-sm text-crit">{error}</span>}
-      </div>
-      <p className="text-xs text-ink-3">Günlere hareket ekle (boş günler dinlenme sayılır). Kalori otomatik hesaplanır; program danışanın Antrenman ekranına düşer, tamamladığında onaylar/atlar.</p>
+      {!onPreview && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="btn btn-primary" onClick={submit} disabled={state === "saving" || totalExercises === 0}>
+            {state === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "saved" ? <Check className="h-4 w-4" /> : <Dumbbell className="h-4 w-4" />}
+            {state === "saved" ? "Gönderildi" : `Programı gönder (${totalExercises} hareket)`}
+          </button>
+          {error && <span className="text-sm text-crit">{error}</span>}
+        </div>
+      )}
+      {!onPreview && (
+        <p className="text-xs text-ink-3">Günlere hareket ekle (boş günler dinlenme sayılır). Kalori otomatik hesaplanır; program danışanın Antrenman ekranına düşer, tamamladığında onaylar/atlar.</p>
+      )}
     </div>
   );
 }
