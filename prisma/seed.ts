@@ -353,14 +353,21 @@ async function main() {
     data: {
       clientId: user.id,
       coachId: coach.id,
-      title: "Hafta 1 — Bazal kuvvet + kardiyo",
+      title: "Demo Ders Değerlendirmesi — 24 Ağustos (Salı)",
       body:
-        "Pzt: Üst vücut kuvvet (5x5 bench, row, ohp)\n" +
-        "Sal: 40 dk tempolu yürüyüş/kardiyo\n" +
-        "Çar: Alt vücut (squat, RDL, lunge)\n" +
-        "Per: Dinlenme / esneme\n" +
-        "Cum: Full body + core\n" +
-        "Not: Antrenman günleri protein 2.0 g/kg. Uyku 7 saat altına düşmesin.",
+        "ÜST EKSTREMİTE\n" +
+        "• Omuz çevresi ve pektoral gruplarda gerginlik.\n" +
+        "• Sırt ve rotator manşet kaslarının kuvvetlendirilmesine ihtiyaç var.\n\n" +
+        "ALT EKSTREMİTE\n" +
+        "• Squat formu iyi; quadriceps kuvvetli ve dominant.\n" +
+        "• Hamstring ve gluteal gruplarda gerginlik. Kalça kas dengesi ve posterior zincir öncelikli.\n\n" +
+        "KALÇA FLEKSÖRLERİ\n" +
+        "• Kuvvet eksikliği; kontrollü kuvvetlendirme ve kalça dengesi desteği planlanacak.\n\n" +
+        "CORE\n" +
+        "• Kuvvet genel olarak iyi; hareket sırasında stabilizasyon ve kontrollü kullanım geliştirilecek.\n\n" +
+        "GENEL ODAK\n" +
+        "Omuz/pektoral gerginliğin azaltılması, sırt + rotator manşet kuvveti, posterior zincirin güçlendirilmesi, " +
+        "kalça çevresi kas dengesi ve core stabilizasyonu.",
       active: true,
     },
   });
@@ -369,7 +376,9 @@ async function main() {
       clientId: user.id,
       coachId: coach.id,
       authorRole: "coach",
-      body: "Merhaba Emre, ilk hafta planını yükledim. Kardiyo günlerinde nabzını 130-150 aralığında tut. Sorunu buradan yazabilirsin.",
+      body:
+        "Merhaba Emre 👋 İlk demo dersimizin (24.08 Salı) değerlendirmesini uygulamaya ekledim — 'Planım' bölümünden görebilirsin. " +
+        "Programını buradan takip edeceğiz: seansları tamamladıkça işaretle, olmadıysa 'Bugün olmadı' de. Sorularını da bu alandan yazabilirsin. 💪",
     },
   });
 
