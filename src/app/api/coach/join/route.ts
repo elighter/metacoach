@@ -11,7 +11,8 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Geçersiz kod." }, { status: 400 });
   }
-  const code = parsed.data.code.trim().toUpperCase();
+  // Birebir eşleşme (kodlar üretimde büyük harf hex; eski karışık-harf kodlar da link ile çalışsın).
+  const code = parsed.data.code.trim();
 
   const invite = await prisma.coachInvite.findUnique({
     where: { code },
