@@ -1,6 +1,8 @@
 # MetaCoach — Oturum Devir Dokümanı (Handoff)
 
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
+> **Backlog:** öncelikli olmayan fikirler `BACKLOG.md`'de (zengin sağlık widget'ları, motto, koç şablonları vb.).
+> **Koç program builder** artık takvim/hafta görünümü (gün-şeridi + seçili gün editörü).
 > Tarih: 2026-08-25 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse, Antrenman modülü, Ön Değerlendirme (`/assessment`) + galeri fix'i (PR #2/#3 master'da). **Son (branch'te, merge bekliyor):** Wearable aktivite otomasyonu — Apple Health/Technogym → webhook (`/api/ingest/health`) → DailyLog/WorkoutSession + otomatik activityBase kalibrasyonu. Manuel antrenman girişini ortadan kaldırır.
 
 ---
