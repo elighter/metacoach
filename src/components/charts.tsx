@@ -152,7 +152,7 @@ export function CalorieBalanceChart({
               <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-lg">
                 <div className="mb-1 font-mono text-ink-3">{label}</div>
                 <div className="text-ink-2">Alınan: <b className="text-ink">{row.intake != null ? `${fmt(row.intake)} kcal` : "—"}</b></div>
-                <div className="text-ink-2">Yakılan: <b className="text-ink">{row.burned != null ? `${fmt(row.burned)} kcal` : "—"}</b></div>
+                <div className="text-ink-2">Harcanan: <b className="text-ink">{row.burned != null ? `${fmt(row.burned)} kcal` : "—"}</b></div>
                 {bal != null && (
                   <div className="text-ink-2">Denge: <b className={bal <= 0 ? "text-good" : "text-warn"}>{bal > 0 ? "+" : ""}{fmt(bal)} kcal</b></div>
                 )}
