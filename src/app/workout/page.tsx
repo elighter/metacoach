@@ -1,8 +1,9 @@
 import { getCurrentUser, prisma } from "@/lib/db";
-import { startOfDay, daysAgo, fmt, fmtDate } from "@/lib/utils";
+import { startOfDay, daysAgo } from "@/lib/utils";
 import { PHASE_LABEL, PHASE_HINT, type Phase } from "@/lib/workout-library";
 import { trainingDayProtein, type DayType, type Goal } from "@/lib/workout";
 import { WorkoutClient, type SessionView } from "@/components/workout-client";
+import { WorkoutHistory } from "@/components/workout-history";
 import { getClientCoachInfo } from "@/lib/coach";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +31,9 @@ export default async function WorkoutPage() {
     }),
     prisma.biometric.findFirst({ where: { userId: user.id }, orderBy: { measuredAt: "desc" }, select: { weightKg: true } }),
     prisma.workoutSession.findMany({
-      where: { userId: user.id, status: "completed", completedAt: { gte: daysAgo(21) }, source: hasCoach ? "coach" : undefined },
+      where: { userId: user.id, status: "completed", completedAt: { gte: daysAgo(60) } },
       orderBy: { completedAt: "desc" },
-      take: 12,
+      take: 200,
     }),
   ]);
 
@@ -91,6 +92,15 @@ export default async function WorkoutPage() {
       scheduledFor: s.scheduledFor.toISOString(),
     }));
 
+  const recentSessions = recent.map((s) => ({
+    id: s.id,
+    label: s.label,
+    source: s.source,
+    completedAt: (s.completedAt ?? s.scheduledFor).toISOString(),
+    durationMin: s.durationMin,
+    estKcal: s.estKcal,
+  }));
+
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="text-2xl font-bold tracking-tight">Antrenman</h1>
@@ -106,33 +116,7 @@ export default async function WorkoutPage() {
         hasCoach={hasCoach}
       />
 
-      {recent.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold tracking-tight">Son antrenmanlar</h2>
-          <p className="mt-0.5 text-sm text-ink-3">Tamamlanan seanslar · Apple Health'ten gelenler otomatik işaretlenir.</p>
-          <div className="mt-3 flex flex-col gap-2">
-            {recent.map((s) => (
-              <div key={s.id} className="card flex items-center justify-between gap-3 p-3.5">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">{s.label}</span>
-                    {s.source === "imported" && (
-                      <span className="pill bg-primary-wash text-primary-ink">Apple Health</span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 text-xs text-ink-3">
-                    {fmtDate(s.completedAt ?? s.scheduledFor, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right text-xs text-ink-2">
-                  {s.durationMin ? <span className="tabular-nums">{s.durationMin} dk</span> : null}
-                  {s.estKcal ? <span className="ml-2 tabular-nums">{fmt(s.estKcal)} kcal</span> : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <WorkoutHistory sessions={recentSessions} />
     </div>
   );
 }
