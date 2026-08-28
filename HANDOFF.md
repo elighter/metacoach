@@ -3,7 +3,7 @@
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
 > **Backlog:** öncelikli olmayan fikirler `BACKLOG.md`'de (zengin sağlık widget'ları, motto, koç şablonları vb.).
 > **Koç program builder** artık takvim/hafta görünümü (gün-şeridi + seçili gün editörü).
-> Tarih: 2026-08-25 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse, Antrenman modülü, Ön Değerlendirme (`/assessment`) + galeri fix'i (PR #2/#3 master'da). **Son (branch'te, merge bekliyor):** Wearable aktivite otomasyonu — Apple Health/Technogym → webhook (`/api/ingest/health`) → DailyLog/WorkoutSession + otomatik activityBase kalibrasyonu. Manuel antrenman girişini ortadan kaldırır.
+> Tarih: 2026-08-28 · Durum: **Faz 0–4B tamamlandı, master'da (PR #1–#23 merge), CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby). Son sprint (PR #13–#23): koç modülü iyileştirmeleri (sade menü, takvim program görünümü, önizleme sandbox, hard-coded isim fix), Mi Scale 2 BLE düzeltmeleri (GATT notification, kilo doğruluğu, ölçüm silme, manuel senkron), dashboard gerçek yakılan kalori (bazal+aktif), antrenman eşleştirmede dayType kontrolü.
 
 ---
 
@@ -86,11 +86,14 @@ src/
     biometrics/               # Mi Scale paneli + ölçüm geçmişi
     nutrition/ metabolism/ profile/ settings/ workout/
     assessment/               # Ön Değerlendirme (antrenör görüşmesi öncesi intake) — server + form
+    coach/preview/            # Koç Önizleme sandbox (planla + danışan görünümünü canlı gör, kaydetmez)
     api/
       auth/[...nextauth]/     # NextAuth handlers
       register/               # kayıt
       ingest/ ingest/confirm/ # parse + onaylı kaydet
       mi-scale/reading/       # tartı ölçümü → kompozisyon
+      biometric/[id]/         # DELETE ölçüm silme (kullanıcı sahiplik kontrolü)
+      ingest/health/manual/   # manuel JSON yükleme (oturum korumalı, token gerektirmez)
       foods/ meals/ meals/[id]/ meals/parse/
       metabolism/recompute/
       profile/ settings/
@@ -107,7 +110,9 @@ src/
     dashboard/dashboard-grid.tsx  # dnd-kit sürükle-sırala + widget aç/kapat + kalıcılık
     dashboard/widgets.tsx     # tüm widget render'ları
     charts.tsx                # Recharts: WeightEnergyChart, TdeeHistoryChart, Ring, Sparkline
-    mi-scale-panel.tsx        # Web Bluetooth + simülatör
+    mi-scale-panel.tsx        # Web Bluetooth (notification tabanlı GATT) + simülatör
+    biometric-history.tsx     # ölçüm geçmişi listesi + silme (çift tıkla onay)
+    coach-access-card.tsx     # Ayarlar'daki koç erişimi kartı (önizleme linki dahil)
     onboarding.tsx            # 5 adımlı wizard (localStorage ile ilk giriş takibi)
     help-fab.tsx              # sağ alt köşe floating yardım butonu + accordion panel
     nutrition-client.tsx      # öğün listesi + fotoğraf AI parse (kamera+galeri ayrı input) + manuel arama
@@ -134,11 +139,12 @@ src/
     workout.ts                  # şablon program üretici + kcal tahmini + adaptif protein
     workout-ai.ts               # Claude program üretici (strict tool call) + aiConfigured()
     workout-service.ts          # regenerateProgram: plan (AI/şablon) → WorkoutProgram+Session+Set kaydı
-prisma/schema.prisma          # User, LabResult, LabBiomarker, Biometric, Meal, DailyLog,
+prisma/schema.prisma          # User, LabResult, LabBiomarker, Biometric, Meal, DailyLog(+basalKcal),
                               # FileAsset, DeviceConnection, Consent, FoodItem,
                               # MetabolismEstimate, DashboardLayout, Settings, PushSubscription,
                               # Exercise, WorkoutProgram, WorkoutSession(+source), WorkoutSet,
                               # CoachAssessment, HealthIngestToken; User(+activityAuto)
+prisma/migrations/20260828.../  # DailyLog.basalKcal migration
 prisma/migrations/0_init/     # Postgres init migration (14 tablo)
 prisma/migrations/20260825110158_add_workout_module/   # antrenman tabloları
 prisma/migrations/20260825120000_add_coach_assessment/ # CoachAssessment tablosu
@@ -176,9 +182,18 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Wearable aktivite otomasyonu** ✅ (2026-08-26, PR #4/#5/#6 master'da, **prod'da uçtan uca doğrulandı**: Health Auto Export → webhook `ok:true`, activityBase kalibre oldu; adaptör gerçek HAE şemasına göre düzeltildi — kJ→kcal, saniye→dk, TR workout tipleri): Manuel antrenman girişi TDEE'yi beslemiyordu (yüksek efor/sıfır fayda) → çözüm: aktiviteyi otomatik akıt. **Karar:** Apple Health tek toplama merkezi (Watch + Technogym oraya senkron), oradan push webhook. **Mimari:** `HealthIngestToken` (kullanıcı başına gizli token) → `POST /api/ingest/health` (Bearer token, session'sız, `PUBLIC_PREFIXES`'te) → `lib/health-import.ts` adaptörü (Health Auto Export JSON + generic/Kısayol biçimi, biçim-toleranslı) → `DailyLog.activeKcal/steps` upsert + `WorkoutSession(source="imported", completed)`; o güne planlı seans varsa onu oto-tamamlar (elle set işaretleme biter). `lib/activity-calibration.ts` son 28 günün aktif kalori/adımından `activityBase`'i otomatik türetir (`User.activityAuto` ile override edilebilir); **yakılan kalori TDEE'ye/hedefe EKLENMEZ** (çift sayma yok). Ayarlar'da "Apple Health & Aktivite" kartı: webhook URL + token + kurulum adımları + yenile. Adaptör fixture testi geçti (HAE + generic). **Not:** Apple tam export'u (`dışa aktarılan.xml`) 671 MB — webhook'a uygun değil; sadece nadir/yerel geçmiş dolgusu (henüz yok). Kullanıcının iOS tarafını (Health Auto Export app veya Kısayol) kurması gerekiyor; gerçek payload ile alan eşlemesi son kez teyit edilecek. `source` alanı `WorkoutSession`'a eklendi.
 - **Ön Değerlendirme modülü** ✅ (2026-08-25, PR #2 master'a merge — build/lint/typecheck temiz; **prod doğrulaması kullanıcıda**): Antrenör/diyetisyen görüşmesi öncesi 3-bölümlük intake — ① son 2-3 günlük yemek alışkanlıkları (serbest metin), ② kişisel rutin (uyanış/uyku saati + hareket seviyesi), ③ son kan tahlilleri varsa (B12, D vit, açlık insülini, HOMA-IR, TSH → referans aralığına göre düşük/normal/yüksek rozet). `/assessment` sayfası + hazırlık göstergeli form (taslak kaydet / görüşmeye gönder), `CoachAssessment` modeli (kullanıcı başına tek kayıt, upsert), `POST /api/assessment`, nav girişi, demo seed. **Not:** kendini-değerlendirme aracı; referans aralıkları bilgi amaçlı, tanı değil.
 - **Fix: öğün fotoğrafı galeriden yükleme** ✅ (2026-08-25, PR #2): `nutrition-client.tsx` tek `<input capture="environment">` kullanıyordu → mobil tarayıcıyı kameraya zorlayıp galeriyi engelliyordu. Kamera (capture'lı) + galeri (capture'sız) için ayrı input ve "Fotoğraf çek" / "Galeriden yükle" iki buton. (Masaüstünde zaten seçici açılıyordu; asıl etki mobilde.)
+- **Fix: antrenman eşleştirmede dayType kontrolü** ✅ (2026-08-28, PR #23): Planlı seansla otomatik eşleştirme artık `dayType` (strength/cardio/functional) kontrolü yapıyor. Önceki davranışta bir yürüyüş (cardio) yanlışlıkla kuvvet seansıyla eşleşebiliyordu. `health-import.ts`.
+- **Mi Scale 2 BLE iyileştirmeleri** ✅ (2026-08-28, PR #20–#22): ① `readValue()` → `startNotifications()` (Mi Scale 2 body composition'ı notification olarak gönderiyor, doğrudan read desteklemiyor — "GATT operation not permitted" düzeldi). ② Birim algılama: catty/jin yanlışlıkla lbs olarak okunuyordu (97.5 kg → 88.5 kg hatası düzeldi). BLE frame'inden ölçüm zamanı çıkarılıyor. ③ Biyometri sayfasına ölçüm silme (çift tıkla onay, `DELETE /api/biometric/[id]`). ④ Ayarlar → Apple Health kartına **manuel JSON yükleme** (sürükle-bırak, `POST /api/ingest/health/manual` — oturum korumalı, token gerektirmez). ⑤ GATT hatası Türkçe kullanıcı dostu mesajla açıklanıyor; iptal sessiz. ⑥ "Yakılan" → "Toplam harcama" (bazal+aktif toplam). 60 sn BLE timeout, bekleme UI, temiz bağlantı kapatma.
+- **Dashboard gerçek yakılan kalori** ✅ (2026-08-28, PR #19): "Yakılan kalori" sabit TDEE (~2850) gösteriyordu → artık **günlük bazal+aktif** gerçek değer. ① `DailyLog.basalKcal` alanı + migration. ② `health-import.ts` basal_energy_burned / resting_energy ingest (kJ→kcal). ③ `dashboard-data.ts` burned = basalKcal + activeKcal (Apple bazal yoksa Katch-McArdle BMR fallback; veri yoksa null — çizgi kırılır). ④ `CalorieBalanceChart` günlük alınan (bar) vs harcanan (çizgi), tooltip'te günlük denge.
+- **Koç Önizleme sandbox** ✅ (2026-08-27, PR #18): Tek ekranda koç programı planla + danışan görünümünü canlı gör. Solda takvim builder, sağda danışanın göreceği hareketler/set/tekrar/MET kalori anında güncellenir. **Hiçbir şey kaydedilmez** — gerçek veriyi etkilemez. `CoachProgramBuilder`'a `onPreview` callback; `/coach/preview` sayfası; Ayarlar→Koç erişimi kartına link.
+- **Fix: dashboard hard-coded isim + davet kodu** ✅ (2026-08-27, PR #17): ① Dashboard selamlaması "Günaydın, Emre" olarak sabitti → giriş yapan kullanıcının adı gösteriliyor. ② Davet kodları base64url (karışık harf) üretiliyordu ama join `toUpperCase()` yapıyordu → "Kod bulunamadı". Kodlar artık büyük harf hex; join birebir eşleşme.
+- **Koç takvim program görünümü** ✅ (2026-08-27, PR #16): `coach-program-builder.tsx` gün-blokları yerine **haftalık takvim** (hafta gezgini + Pzt-Paz gün şeridi + seçili gün editörü). Boş günler dinlenme; API aynı.
+- **Koç menü sadeleştirme** ✅ (2026-08-27, PR #14): Koç menüsü yalnızca "Danışanlar" + "Ayarlar"a indirildi (kullanıcı ekranları koça gösterilmiyordu — kalabalık/karışıklık). Tek danışanı olan koç `/coach`'a girince doğrudan o danışanın paneline yönlenir.
+- **Demo seed güncelleme** ✅ (2026-08-27, PR #15): TrainingPlan gerçek 24.08 ders değerlendirmesiyle güncellendi (üst/alt ekstremite, kalça fleksörleri, core).
+- **Fix: callbackUrl koç davet linki** ✅ (2026-08-26, PR #13): Middleware redirect'i callbackUrl'i mutlak URL olarak veriyordu; `safeCallback` yalnızca `"/"`ile başlayanı kabul edip tam URL'i `"/"`'a düşürüyordu → koç giriş sonrası `/coach/accept`'e gitmiyordu. Aynı-origin mutlak URL artık path+search olarak kabul ediliyor.
 - **Antrenman modülü** ✅ (2026-08-25, tarayıcıda doğrulandı): 4 fazlı periyodizasyon (hazırlık→ana yüklenme→kardiyo→soğuma), 3 gün A/B split (A=kuvvet, B=fonksiyonel). Claude ile kişiye özel program üretimi (strict tool call) + deterministik şablon fallback. 34 egzersizlik salon kütüphanesi. `/workout` sayfası (4 faz akordeonu, set işaretle/ağırlık logla, seansı tamamla), dashboard `nextWorkout` widget'ı, "Antrenman" nav. Adaptif antrenman-günü protein artışı. **Kritik karar:** tahmini yakılan kalori sadece gösterim — Dynamic TDEE'ye BESLENMEZ (çift sayım önlenir; TDEE zaten toplam harcamayı kilo/alım'dan öğreniyor). estKcal doğrulandı (519 kcal / 59 dk).
 
-**Build:** 30+ route + middleware (workout + assessment dahil), tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app`
+**Build:** 30+ route + middleware (workout + assessment + coach preview + biometric delete + manual ingest dahil), tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app`
 
 ---
 
@@ -240,10 +255,10 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - Güvenlik başlıkları (CSP, HSTS, X-Frame-Options) ✅
 - Next.js 15.5.23 (CVE-2025-66478 fix) ✅
 
-### ⏳ Prod doğrulaması bekleyen (2026-08-25, PR #2 merge sonrası)
-- **Ön Değerlendirme (`/assessment`)** — merge edildi, Vercel deploy tetiklendi; canlıda kullanıcı doğrulaması bekleniyor.
-- **Öğün fotoğrafı galeriden yükleme** — aynı deploy. Kullanıcı ilk kontrolde "durum aynı" dedi; bunun nedeni değişikliğin o an sadece feature dalında olmasıydı (master'a merge edilmemişti). PR #2 ile master'a alındı. Mobilde hâlâ eskiyse **PWA/service-worker cache** şüphesi — hard-refresh / uygulamayı kapat-aç.
-- **Migration:** `20260825120000_add_coach_assessment` prod build'de `prisma migrate deploy` ile Neon'a uygulanır — deploy loglarında doğrulanmalı.
+### ⏳ Prod doğrulaması bekleyen (2026-08-28)
+- **Mi Scale 2 BLE (notification tabanlı okuma + kilo doğruluğu)** — PR #21-#22, canlıda gerçek tartı ile test bekleniyor.
+- **Dashboard gerçek yakılan kalori** — PR #19, `DailyLog.basalKcal` migration'ı prod'a uygulanmış olmalı; canlıda grafik kontrolü bekleniyor.
+- **Manuel sağlık verisi yükleme** — PR #22, Ayarlar'dan JSON sürükle-bırak ile ingest; prod testi bekleniyor.
 
 ---
 
