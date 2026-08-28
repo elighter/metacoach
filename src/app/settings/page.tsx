@@ -29,9 +29,6 @@ export default async function SettingsPage() {
       <div className="mt-5">
         <SettingsForm
           initial={{
-            notifyWeighIn: settings?.notifyWeighIn ?? true,
-            notifyMeals: settings?.notifyMeals ?? false,
-            weeklyReport: settings?.weeklyReport ?? true,
             tdeeWindowDays: settings?.tdeeWindowDays ?? 21,
           }}
           devices={devices.map((d) => ({

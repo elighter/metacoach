@@ -270,6 +270,10 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Mi Scale 2 BLE (notification tabanlı okuma + kilo doğruluğu)** — PR #21-#22, canlıda gerçek tartı ile test bekleniyor.
 - **Dashboard gerçek yakılan kalori** — PR #19, `DailyLog.basalKcal` migration'ı prod'a uygulanmış olmalı; canlıda grafik kontrolü bekleniyor.
 - **Manuel sağlık verisi yükleme** — PR #22, Ayarlar'dan JSON sürükle-bırak ile ingest; prod testi bekleniyor.
+- **Antrenman geçmişi takvim şeridi** — gün bazlı gruplama, kaynak rozeti, 10+ sayfalama.
+- **Koç e-postasında program kontrolü** — `source:"coach"` filtresi, template/AI programlar yanlış "program var" göstermez.
+- **Dashboard dün desteği** — gece yarısından sonra bugün verisi yoksa dünün beslenme/aktivitesini "Dün" etiketiyle gösterir.
+- **Bildirim toggle'ları kaldırıldı** — `notifyWeighIn`/`notifyMeals`/`weeklyReport` toggle'ları işlevsizdi (backend scheduler yoktu), yanıltıcı olduğu için UI'dan kaldırıldı. DB kolonları hâlâ var (zararsız). Push bildirimleri (PushControls) yerinde.
 
 ---
 

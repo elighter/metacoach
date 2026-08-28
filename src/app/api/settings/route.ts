@@ -3,9 +3,6 @@ import { z } from "zod";
 import { prisma, getCurrentUser } from "@/lib/db";
 
 const schema = z.object({
-  notifyWeighIn: z.boolean().optional(),
-  notifyMeals: z.boolean().optional(),
-  weeklyReport: z.boolean().optional(),
   tdeeWindowDays: z.number().int().min(7).max(56).optional(),
 });
 
