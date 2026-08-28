@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await applyHealthImport(user.id, normalized);
+  const result = await applyHealthImport(user.id, normalized, "manual");
   const calibration = await maybeCalibrateActivity(user.id);
 
   return NextResponse.json({ ok: true, source: normalized.source, ...result, calibration });

@@ -16,7 +16,15 @@ interface SettingsData {
 }
 interface Device { provider: string; status: string; lastSyncAt: string | null }
 interface ConsentItem { type: string; version: string; grantedAt: string }
-interface AppleHealth { token: string | null; lastSyncAt: string | null }
+interface IngestLog {
+  at: string;
+  via: string;
+  daysReceived: number;
+  workoutsReceived: number;
+  workoutsCreated: number;
+  sessionsCompleted: number;
+}
+interface AppleHealth { token: string | null; lastSyncAt: string | null; logs: IngestLog[] }
 
 const deviceMeta: Record<string, { label: string; icon: any }> = {
   mi_scale: { label: "Mi Body Composition Scale 2", icon: Bluetooth },
@@ -237,16 +245,29 @@ function AppleHealthCard({ appleHealth }: { appleHealth: AppleHealth }) {
           <Field label="Token (gizli)" value={token} mono onCopy={() => copy(token, "token")} copied={copied === "token"} />
 
           <div className="rounded-lg bg-surface-2 p-3 text-xs leading-relaxed text-ink-2">
-            <div className="mb-1 font-semibold text-ink">Kurulum (Health Auto Export)</div>
+            <div className="mb-1 font-semibold text-ink">Kurulum (Health Auto Export) — 2 otomasyon gerekir</div>
+            <p className="mb-2 text-ink-3">
+              HAE&apos;de <b>Sağlık Metriği</b> ve <b>Antrenmanlar</b> ayrı export türleridir; tek otomasyon
+              ikisini birden göndermez. Antrenmanların akması için ikincisini de eklemelisin.
+            </p>
             <ol className="ml-4 list-decimal space-y-0.5">
-              <li>App Store'dan <b>Health Auto Export – JSON+CSV</b> kur.</li>
-              <li><b>Automations → REST API</b> ekle; URL'ye webhook adresini yapıştır.</li>
+              <li>App Store&apos;dan <b>Health Auto Export – JSON+CSV</b> kur.</li>
+              <li><b>Automations → Add Automation → REST API</b>; URL&apos;ye webhook adresini yapıştır.</li>
               <li>Header ekle: <span className="font-mono">Authorization: Bearer &lt;token&gt;</span></li>
-              <li>Metrikler: <b>Active Energy, Basal Energy Burned, Step Count, Workouts</b>. Aggregation: <b>Daily</b>, format <b>JSON</b>.</li>
-              <li>Otomasyonu günlük çalışacak şekilde kaydet.</li>
+              <li>
+                <b>1. otomasyon — Health Metrics:</b> metrikler <b>Active Energy, Basal Energy Burned,
+                Step Count</b>. Aggregation <b>Daily</b>, format <b>JSON</b>.
+              </li>
+              <li>
+                <b>2. otomasyon — Workouts:</b> aynı URL ve header ile ikinci bir otomasyon ekle, export
+                türü <b>Workouts</b>, format <b>JSON</b>. (Antrenmanlar yalnızca buradan gelir.)
+              </li>
+              <li>İkisini de günlük/periyodik çalışacak şekilde kaydet.</li>
             </ol>
             <div className="mt-2 text-ink-3">Alternatif: Apple Kısayol ile aynı adrese POST eden bir otomasyon da kullanılabilir.</div>
           </div>
+
+          <SyncDiagnostics logs={appleHealth.logs} />
 
           <ManualSyncUpload />
 
@@ -264,6 +285,50 @@ function AppleHealthCard({ appleHealth }: { appleHealth: AppleHealth }) {
           <p className="text-xs text-ink-3">
             Token'ı gizli tut; yenilersen eski kurulum çalışmayı durdurur ve adresi güncellemen gerekir.
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Son içe aktarmaları gösterir. Asıl amacı: yalnızca metrik gönderen bir HAE
+ * kurulumu "başarılı senkron" gibi görünüyordu — antrenman sayısı 0 ise bunu
+ * açıkça söyler.
+ */
+function SyncDiagnostics({ logs }: { logs: IngestLog[] }) {
+  if (logs.length === 0) return null;
+
+  const workoutsMissing = logs.every((l) => l.workoutsReceived === 0);
+
+  return (
+    <div className="rounded-lg bg-surface-2 p-3 text-xs">
+      <div className="mb-2 font-semibold text-ink">Son senkronlar</div>
+      <ul className="space-y-1">
+        {logs.map((l, i) => (
+          <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-ink-2">
+            <span className="tabular-nums text-ink-3">
+              {fmtDate(l.at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </span>
+            <span className="text-ink-3">·</span>
+            <span>{l.daysReceived} gün</span>
+            <span className="text-ink-3">·</span>
+            <span className={l.workoutsReceived === 0 ? "text-warn" : "text-good"}>
+              {l.workoutsReceived} antrenman
+            </span>
+            {l.sessionsCompleted > 0 && (
+              <span className="text-ink-3">({l.sessionsCompleted} seans tamamlandı)</span>
+            )}
+            {l.via === "manual" && <span className="text-ink-3">· manuel</span>}
+          </li>
+        ))}
+      </ul>
+      {workoutsMissing && (
+        <div className="mt-2 rounded-md bg-warn-wash px-2.5 py-2 text-warn">
+          <b>Antrenman verisi gelmiyor.</b> Son senkronların hiçbirinde antrenman yok — büyük olasılıkla
+          HAE&apos;de yalnızca <b>Health Metrics</b> otomasyonu kurulu. Yukarıdaki <b>2. otomasyon
+          (Workouts)</b> adımını ekle; ya da geçmişi hemen doldurmak için HAE&apos;den <b>Workouts</b>
+          JSON&apos;u dışa aktarıp aşağıdan manuel yükle.
         </div>
       )}
     </div>

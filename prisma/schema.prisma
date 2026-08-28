@@ -45,6 +45,7 @@ model User {
   workoutSessions     WorkoutSession[]
   coachAssessment     CoachAssessment?
   healthIngestToken   HealthIngestToken?
+  healthIngestLogs    HealthIngestLog[]
 
   coachLinksAsCoach   CoachLink[]    @relation("CoachLinkCoach")
   coachLinksAsClient  CoachLink[]    @relation("CoachLinkClient")
@@ -340,6 +341,25 @@ model HealthIngestToken {
   token      String    @unique
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
+}
+
+// Her içe aktarma denemesinin kaydı. Amaç: "senkron oldu ama antrenman gelmedi"
+// durumunu görünür kılmak — HAE'de Workouts ayrı bir otomasyon gerektirir ve
+// yalnızca metrik gönderen bir kurulum, başarılı senkronla aynı görünüyordu.
+model HealthIngestLog {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  at                DateTime @default(now())
+  via               String // webhook | manual
+  source            String // health_auto_export | generic
+  daysReceived      Int      @default(0)
+  workoutsReceived  Int      @default(0)
+  daysWritten       Int      @default(0)
+  workoutsCreated   Int      @default(0)
+  sessionsCompleted Int      @default(0)
+
+  @@index([userId, at])
 }
 
 // ── Koç / PT (hafif MVP) ───────────────────────────────────────────────────

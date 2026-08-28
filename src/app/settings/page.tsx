@@ -7,12 +7,17 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();
-  const [settings, devices, consents, healthToken, coachInfo] = await Promise.all([
+  const [settings, devices, consents, healthToken, coachInfo, ingestLogs] = await Promise.all([
     prisma.settings.findUnique({ where: { userId: user.id } }),
     prisma.deviceConnection.findMany({ where: { userId: user.id } }),
     prisma.consent.findMany({ where: { userId: user.id, revokedAt: null } }),
     prisma.healthIngestToken.findUnique({ where: { userId: user.id } }),
     getClientCoachInfo(user.id),
+    prisma.healthIngestLog.findMany({
+      where: { userId: user.id },
+      orderBy: { at: "desc" },
+      take: 5,
+    }),
   ]);
   const appleHealthSync = devices.find((d) => d.provider === "apple_health");
 
@@ -42,6 +47,14 @@ export default async function SettingsPage() {
           appleHealth={{
             token: healthToken?.token ?? null,
             lastSyncAt: appleHealthSync?.lastSyncAt ? appleHealthSync.lastSyncAt.toISOString() : null,
+            logs: ingestLogs.map((l) => ({
+              at: l.at.toISOString(),
+              via: l.via,
+              daysReceived: l.daysReceived,
+              workoutsReceived: l.workoutsReceived,
+              workoutsCreated: l.workoutsCreated,
+              sessionsCompleted: l.sessionsCompleted,
+            })),
           }}
         />
 

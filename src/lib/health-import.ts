@@ -131,7 +131,7 @@ function normalizeHealthAutoExport(data: Record<string, unknown>): NormalizedHea
   for (const w of rawWorkouts as Record<string, unknown>[]) {
     const start = toIso(w?.start ?? w?.startDate);
     if (!start) continue;
-    const rawType = String(w?.name ?? w?.workoutActivityType ?? "Antrenman");
+    const rawType = String(w?.name ?? w?.workoutActivityType ?? w?.type ?? "Antrenman");
     const dayType = mapWorkoutDayType(rawType);
     const end = toIso(w?.end ?? w?.endDate);
     // HAE duration = saniye (düz sayı). En güvenilir kaynak start–end farkı.
@@ -178,9 +178,9 @@ function normalizeGeneric(payload: Record<string, unknown>): NormalizedHealth {
   const workouts: NormalizedWorkout[] = [];
   const rawWorkouts = Array.isArray(payload.workouts) ? payload.workouts : [];
   for (const w of rawWorkouts as Record<string, unknown>[]) {
-    const start = toIso(w?.start);
+    const start = toIso(w?.start ?? w?.startDate);
     if (!start) continue;
-    const rawType = String(w?.type ?? "Antrenman");
+    const rawType = String(w?.type ?? w?.name ?? "Antrenman");
     workouts.push({
       type: rawType,
       label: rawType,
@@ -204,6 +204,11 @@ export function normalizeHealthPayload(payload: unknown): NormalizedHealth {
   if (data && (Array.isArray(data.metrics) || Array.isArray(data.workouts))) {
     return normalizeHealthAutoExport(data);
   }
+  // HAE'nin bazı sürümleri/otomasyonları "data" sarmalayıcısı olmadan gönderir.
+  // "days" varsa generic biçimdir — oraya düşmesin.
+  if (!Array.isArray(p.days) && (Array.isArray(p.metrics) || Array.isArray(p.workouts))) {
+    return normalizeHealthAutoExport(p);
+  }
   return normalizeGeneric(p);
 }
 
@@ -225,6 +230,7 @@ export interface ImportResult {
 export async function applyHealthImport(
   userId: string,
   n: NormalizedHealth,
+  via: "webhook" | "manual" = "webhook",
 ): Promise<ImportResult> {
   let daysWritten = 0;
   for (const d of n.days) {
@@ -320,6 +326,20 @@ export async function applyHealthImport(
       data: { userId, provider: "apple_health", status: "connected", lastSyncAt: new Date() },
     });
   }
+
+  // Ne alındığını kaydet — "senkron oldu ama antrenman gelmedi" ancak böyle görünür.
+  await prisma.healthIngestLog.create({
+    data: {
+      userId,
+      via,
+      source: n.source,
+      daysReceived: n.days.length,
+      workoutsReceived: n.workouts.length,
+      daysWritten,
+      workoutsCreated,
+      sessionsCompleted,
+    },
+  });
 
   return { daysWritten, workoutsCreated, sessionsCompleted };
 }
