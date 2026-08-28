@@ -141,7 +141,8 @@ model DailyLog {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   date          DateTime
   caloriesIn    Float    @default(0)
-  activeKcal    Float    @default(0)
+  activeKcal    Float    @default(0) // Apple Health aktif kalori (hareket)
+  basalKcal     Float?             // Apple Health bazal/dinlenme kalorisi
   steps         Int      @default(0)
   weightTrend   Float?
   tdeeDynamic   Float?

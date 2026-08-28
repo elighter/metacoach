@@ -12,7 +12,6 @@ import {
   CartesianGrid,
   LineChart,
   Line,
-  ReferenceLine,
 } from "recharts";
 import type { ChartPoint } from "@/lib/dashboard-data";
 import { fmt } from "@/lib/utils";
@@ -131,13 +130,11 @@ export function WeightEnergyChart({ data }: { data: ChartPoint[] }) {
   );
 }
 
-/** Günlük alınan kalori (bar) vs yakılan/TDEE (çizgi). Bar rengi fazla/açık dengeye göre. */
+/** Günlük alınan (bar) vs yakılan (çizgi, Apple bazal+aktif). Bar rengi güne göre fazla/açık. */
 export function CalorieBalanceChart({
   data,
-  tdee,
 }: {
-  data: { label: string; intake: number }[];
-  tdee: number;
+  data: { label: string; intake: number | null; burned: number | null }[];
 }) {
   return (
     <ResponsiveContainer width="100%" height={200}>
@@ -147,24 +144,28 @@ export function CalorieBalanceChart({
         <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} width={40} allowDecimals={false} />
         <Tooltip
           cursor={{ fill: "var(--surface-2)", opacity: 0.5 }}
-          content={({ active, payload, label }: any) =>
-            active && payload?.length ? (
+          content={({ active, payload, label }: any) => {
+            if (!active || !payload?.length) return null;
+            const row = payload[0].payload as { intake: number | null; burned: number | null };
+            const bal = row.intake != null && row.burned != null ? row.intake - row.burned : null;
+            return (
               <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-lg">
                 <div className="mb-1 font-mono text-ink-3">{label}</div>
-                <div className="text-ink-2">Alınan: <b className="text-ink">{fmt(payload[0].value)} kcal</b></div>
-                <div className="text-ink-2">Yakılan: <b className="text-ink">{fmt(tdee)} kcal</b></div>
-                <div className="text-ink-2">Denge: <b className={payload[0].value - tdee <= 0 ? "text-good" : "text-warn"}>
-                  {payload[0].value - tdee > 0 ? "+" : ""}{fmt(payload[0].value - tdee)} kcal</b></div>
+                <div className="text-ink-2">Alınan: <b className="text-ink">{row.intake != null ? `${fmt(row.intake)} kcal` : "—"}</b></div>
+                <div className="text-ink-2">Yakılan: <b className="text-ink">{row.burned != null ? `${fmt(row.burned)} kcal` : "—"}</b></div>
+                {bal != null && (
+                  <div className="text-ink-2">Denge: <b className={bal <= 0 ? "text-good" : "text-warn"}>{bal > 0 ? "+" : ""}{fmt(bal)} kcal</b></div>
+                )}
               </div>
-            ) : null
-          }
+            );
+          }}
         />
         <Bar dataKey="intake" radius={[3, 3, 0, 0]} maxBarSize={34} isAnimationActive={false}>
           {data.map((d, i) => (
-            <Cell key={i} fill={d.intake > tdee ? "var(--warn)" : "var(--good)"} fillOpacity={0.55} />
+            <Cell key={i} fill={d.intake != null && d.burned != null && d.intake > d.burned ? "var(--warn)" : "var(--good)"} fillOpacity={0.55} />
           ))}
         </Bar>
-        <ReferenceLine y={tdee} stroke="var(--primary)" strokeWidth={2} strokeDasharray="4 3" />
+        <Line dataKey="burned" stroke="var(--primary)" strokeWidth={2} dot={{ r: 2.5 }} connectNulls isAnimationActive={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );

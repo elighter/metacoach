@@ -86,6 +86,7 @@ async function main() {
     const logged = rng() > 0.15;
     const caloriesIn = logged ? Math.round(2350 + (rng() - 0.5) * 420) : 0;
     const activeKcal = Math.round(320 + rng() * 340);
+    const basalKcal = Math.round(2050 + rng() * 220); // Apple bazal (dinlenme) ~2050-2270
     const steps = Math.round(6500 + rng() * 5200);
 
     // Mi Scale reading roughly every other day
@@ -114,6 +115,7 @@ async function main() {
         date,
         caloriesIn,
         activeKcal,
+        basalKcal,
         steps,
         weightTrend: measured,
       },
