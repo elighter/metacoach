@@ -74,7 +74,14 @@ export function MiScalePanel({
       if (!reading || !reading.impedance) throw new Error("Ölçüm okunamadı — tartıya çıplak ayakla tekrar çıkın.");
       await post(reading.weightKg, reading.impedance, "ble");
     } catch (e: any) {
-      setError(e?.message ?? "Bluetooth bağlantısı başarısız.");
+      const msg = String(e?.message ?? "");
+      if (msg.includes("GATT") || msg.includes("not permitted") || msg.includes("not allowed")) {
+        setError("Tartıyla bağlantı kuruldu ancak veri okunamadı. Tartıya çıplak ayakla çıkıp impedans ölçümünün tamamlanmasını bekleyin, ardından tekrar deneyin.");
+      } else if (msg.includes("cancelled") || msg.includes("canceled") || msg.includes("User cancelled")) {
+        setError(null);
+      } else {
+        setError(msg || "Bluetooth bağlantısı başarısız.");
+      }
     } finally {
       setBusy(null);
     }

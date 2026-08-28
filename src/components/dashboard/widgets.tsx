@@ -225,7 +225,7 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
       return (
         <Panel
           title="Haftalık kalori dengesi"
-          sub="Alınan (bar) · yakılan (çizgi, Apple bazal+aktif)"
+          sub="Alınan (bar) · toplam harcama (çizgi, bazal+aktif)"
           right={
             avgBalance != null ? (
               <span className={cn("pill", avgBalance <= 0 ? "bg-good-wash text-good" : "bg-warn-wash text-warn")}>
@@ -265,7 +265,7 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
             <div className="text-sm">
               <div className="text-xs text-ink-3">Alınan</div>
               <div className="text-lg font-bold tabular-nums">{fmt(consumed.kcal)}<span className="text-xs font-medium text-ink-3"> kcal</span></div>
-              <div className="mt-2 text-xs text-ink-3">Yakılan (TDEE)</div>
+              <div className="mt-2 text-xs text-ink-3">Toplam harcama</div>
               <div className="text-lg font-bold tabular-nums">{fmt(tdee.tdee)}<span className="text-xs font-medium text-ink-3"> kcal</span></div>
             </div>
           </div>
