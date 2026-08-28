@@ -276,15 +276,16 @@ export async function applyHealthImport(
       continue;
     }
 
-    // Aksi halde: aynı start dakikasında zaten import edilmiş mi? (tekilleştirme)
-    const minute = new Date(Math.floor(start.getTime() / 60000) * 60000);
-    const minuteEnd = new Date(minute.getTime() + 60000);
+    // Tekilleştirme: aynı label ile ±5 dk içinde tamamlanmış HERHANGİ bir seans
+    // varsa atla. source filtresi yok — planlı seansı tamamlayıp sonra tekrar
+    // imported olarak oluşturma bugını önler.
+    const window5 = 5 * 60000;
     const dup = await prisma.workoutSession.findFirst({
       where: {
         userId,
-        source: "imported",
-        scheduledFor: { gte: minute, lt: minuteEnd },
         label: w.label,
+        status: "completed",
+        scheduledFor: { gte: new Date(start.getTime() - window5), lte: new Date(start.getTime() + window5) },
       },
     });
     if (dup) continue;
