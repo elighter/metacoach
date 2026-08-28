@@ -8,22 +8,20 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
 
-  const coaches = await prisma.user.findMany({
-    where: { role: "coach" },
-    select: { id: true, name: true, email: true },
+  const links = await prisma.coachLink.findMany({
+    where: { status: "active" },
+    include: {
+      coach: { select: { id: true, name: true, email: true } },
+      client: { select: { id: true, name: true, email: true } },
+    },
   });
 
-  if (coaches.length === 0) {
-    return NextResponse.json({ error: "No coaches found" }, { status: 404 });
+  if (links.length === 0) {
+    return NextResponse.json({ error: "No active coach links found" }, { status: 404 });
   }
 
-  const coach = coaches[0];
+  const coach = links[0].coach;
   const weekAgo = daysAgo(7);
-
-  const links = await prisma.coachLink.findMany({
-    where: { coachId: coach.id, status: "active" },
-    include: { client: { select: { id: true, name: true, email: true } } },
-  });
 
   const summaries = [];
   for (const link of links) {
