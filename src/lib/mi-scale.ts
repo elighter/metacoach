@@ -86,25 +86,48 @@ export interface MiScaleReading {
   impedance: number | null;
   stabilized: boolean;
   impedanceReady: boolean;
+  measuredAt: Date | null;
 }
 
 export function parseMiScalePayload(bytes: Uint8Array): MiScaleReading | null {
   if (bytes.length < 13) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const ctrl0 = bytes[0];
   const ctrl1 = bytes[1];
   const stabilized = (ctrl1 & (1 << 5)) !== 0;
   const impedanceReady = (ctrl1 & (1 << 1)) !== 0;
-  const unitIsKg = (bytes[0] & 0x01) !== 0 || (ctrl1 & (1 << 4)) !== 0;
+
+  // Unit detection: ctrl0 bit0 = "not catty" flag; ctrl1 bit4 = kg display.
+  // Three modes: catty/jin (both 0), kg (bit0=1 & bit4=1), lbs (bit0=1 & bit4=0).
+  // Catty and kg both use raw/200 to get kg; lbs uses (raw/100)*0.45359237.
+  const notCatty = (ctrl0 & 0x01) !== 0;
+  const kgDisplay = (ctrl1 & (1 << 4)) !== 0;
+  const isLbs = notCatty && !kgDisplay;
 
   const impedanceRaw = view.getUint16(9, true);
   const weightRaw = view.getUint16(11, true);
-  const weightKg = unitIsKg ? weightRaw / 200 : (weightRaw / 100) * 0.4536;
+  const weightKg = isLbs
+    ? (weightRaw / 100) * 0.45359237
+    : weightRaw / 200;
+
+  // Timestamp: bytes 2-3 = year (uint16 LE), 4 = month, 5 = day, 6 = h, 7 = m, 8 = s.
+  const year = view.getUint16(2, true);
+  const month = bytes[4];
+  const day = bytes[5];
+  const hour = bytes[6];
+  const minute = bytes[7];
+  const second = bytes[8];
+  let measuredAt: Date | null = null;
+  if (year >= 2020 && year <= 2099 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+    measuredAt = new Date(year, month - 1, day, hour, minute, second);
+  }
 
   return {
     weightKg: Number(weightKg.toFixed(2)),
     impedance: impedanceReady ? impedanceRaw : null,
     stabilized,
     impedanceReady,
+    measuredAt,
   };
 }
 

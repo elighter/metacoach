@@ -8,6 +8,7 @@ const schema = z.object({
   weightKg: z.number().min(20).max(400),
   impedance: z.number().min(100).max(1200),
   source: z.enum(["ble", "simulated"]).default("simulated"),
+  measuredAt: z.string().datetime().optional(),
 });
 
 export async function POST(req: Request) {
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
     sex: user.sex,
   });
 
-  const measuredAt = new Date();
+  const measuredAt = parsed.data.measuredAt ? new Date(parsed.data.measuredAt) : new Date();
   const bio = await prisma.biometric.create({
     data: {
       userId: user.id,
