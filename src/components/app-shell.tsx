@@ -13,7 +13,6 @@ import {
   Gauge,
   ClipboardList,
   Users,
-  NotebookText,
   User,
   Settings,
   Menu,
@@ -112,7 +111,7 @@ function NavLinks({ onNavigate, role }: { onNavigate?: () => void; role: string 
     );
   }
   // Danışan: günlük ekranlar + "Hesap" grubu ("Planım" başta).
-  const secondary = [{ href: "/plan", label: "Planım", icon: NotebookText } as NavItem, ...NAV_SECONDARY];
+  const secondary = NAV_SECONDARY;
   return (
     <nav className="flex flex-col gap-1">
       {NAV_PRIMARY.map((item) => (

@@ -143,8 +143,8 @@ export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoac
           <p className="mx-auto mt-1 max-w-md text-sm text-ink-3">
             Koçun henüz bir antrenman programı oluşturmadı. Programın hazır olduğunda burada görünecek.
           </p>
-          <a href="/plan" className="btn-primary mx-auto mt-5 inline-flex items-center gap-2">
-            Planımı görüntüle →
+          <a href="/workout" className="btn-primary mx-auto mt-5 inline-flex items-center gap-2">
+            Antrenmanı görüntüle →
           </a>
         </div>
       );
