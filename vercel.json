@@ -3,6 +3,12 @@
   "framework": "nextjs",
   "buildCommand": "npm run db:provider && prisma migrate deploy && npm run build",
   "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/api/cron/coach-reminder",
+      "schedule": "0 6 * * 1"
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",

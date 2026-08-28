@@ -3,7 +3,7 @@
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
 > **Backlog:** öncelikli olmayan fikirler `BACKLOG.md`'de (zengin sağlık widget'ları, motto, koç şablonları vb.).
 > **Koç program builder** artık takvim/hafta görünümü (gün-şeridi + seçili gün editörü).
-> Tarih: 2026-08-28 · Durum: **Faz 0–4B tamamlandı, master'da (PR #1–#26 merge), CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby). Son sprint (PR #13–#26): koç modülü iyileştirmeleri, Mi Scale 2 BLE düzeltmeleri, dashboard gerçek kalori, antrenman dedup güçlendirme, zamana göre selamlama, antrenman senkron teşhisi, **dashboard koç planı widget'ı + koç-bilinçli antrenman**.
+> Tarih: 2026-08-28 · Durum: **Faz 0–4B tamamlandı, master'da (PR #1–#26 merge), CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby). Son sprint (PR #13–#26): koç modülü iyileştirmeleri, Mi Scale 2 BLE düzeltmeleri, dashboard gerçek kalori, antrenman dedup güçlendirme, zamana göre selamlama, antrenman senkron teşhisi, dashboard koç planı widget'ı + koç-bilinçli antrenman, **Resend ile koç haftalık hatırlatma e-postası**.
 > ⚠️ **HAE 2. otomasyon (Workouts) kuruldu** — antrenman senkronu aktif.
 
 ---
@@ -105,6 +105,7 @@ src/
       settings/health-token/  # ingest token (yeniden) üret (session korumalı)
       push/subscribe/ push/test/   # web push
       health/                 # DB ping, auth'suz
+      cron/coach-reminder/    # haftalık koç hatırlatma (Vercel Cron, CRON_SECRET)
   components/
     app-shell.tsx             # sidebar + topbar + tema + çıkış + kullanıcı
     theme-provider.tsx        # system/light/dark, .dark class, no-flash
@@ -129,6 +130,7 @@ src/
     claude-parser.ts          # gerçek Claude Vision (Sonnet 5 default, strict tool call) — lab, inbody, meal photo
     parser.ts                 # mock/claude dağıtıcısı (PARSE_PROVIDER) — Claude hatasında throw (sessiz fallback yok)
     push.ts                   # web-push (VAPID) sunucu tarafı
+    email.ts                  # Resend e-posta istemcisi (koç hatırlatma vb.)
     storage.ts                # S3/R2 adaptör (env-gated, yoksa local disk fallback)
     dashboard-data.ts         # dashboard veri toplayıcı + TDEE hesaplar
     widgets.ts                # widget kaydı & varsayılan yerleşim
@@ -156,7 +158,7 @@ scripts/set-db-provider.mjs   # DATABASE_URL'den provider otomatik ayar
 .github/workflows/ci.yml      # typecheck + lint + build + Postgres migrate smoke
 sentry.*.config.ts            # server/edge/client Sentry (DSN yoksa inert)
 instrumentation.ts            # Next.js instrumentation hook
-vercel.json                   # build: db:provider + migrate deploy + next build; region fra1
+vercel.json                   # build: db:provider + migrate deploy + next build; region fra1; crons: coach-reminder (Pzt 06:00 UTC)
 docker-compose.yml            # yerel Postgres 16 test
 public/ manifest.webmanifest sw.js offline.html icons/
 ```
@@ -187,6 +189,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Fix: antrenman eşleştirmede dayType kontrolü + dedup güçlendirme** ✅ (2026-08-28, PR #23-#24): ① Planlı seansla otomatik eşleştirme artık `dayType` (strength/cardio/functional) kontrolü yapıyor. ② **Dedup bugı düzeltildi:** tekilleştirme yalnızca `source:"imported"` seansları kontrol ediyordu — planlı seansı tamamlayıp sonra aynı antrenmanı "imported" olarak tekrar oluşturuyordu. Artık **tüm kaynaklar** (planlı/koç/imported) ±5dk penceresi + aynı label ile kontrol ediliyor. `health-import.ts`.
 - **Antrenman senkron teşhisi + HAE 2-otomasyon düzeltmesi** ✅ (2026-08-28, PR #25): **Kök neden bulundu** — antrenmanlar 27 Ağu'da donmuştu çünkü HAE'de **Workouts ayrı bir export türüdür**, metrik listesinde seçilen bir öğe değil. Kurulum talimatı `Workouts`'u metrik gibi sayıyordu → kullanıcının otomasyonu yalnızca "Sağlık Metriği" gönderiyordu, antrenman hiç gelmiyordu. Ingest hattının kendisi sağlam (fixture doğrulaması: HAE workouts payload'ı → 22 dk / 194 kcal, ekrandaki değerle birebir). ① **`HealthIngestLog` modeli + migration** — her içe aktarma kaydediliyor (via, source, alınan/yazılan gün + antrenman sayısı). Önceden yalnızca `lastSyncAt` vardı; metrik-only senkron başarılı senkronla aynı görünüyordu. ② Ayarlar'da **"Son senkronlar"** paneli (`SyncDiagnostics`): her satırda gün/antrenman sayısı; son senkronların hepsinde antrenman 0 ise **uyarı** çıkıyor ve eksik otomasyonu tarif ediyor. ③ Kurulum talimatı **2 otomasyon** olarak düzeltildi (Health Metrics + Workouts). ④ Payload toleransı: `data` sarmalayıcısı olmadan gelen `workouts`/`metrics` de tanınıyor (`days` varsa generic'e düşer — regresyon testli), workout tipi `name`/`type`/`workoutActivityType` üçünden de okunuyor.
 - **Dashboard koç planı widget'ı + koç-bilinçli antrenman + admin debug** ✅ (2026-08-28, PR #26): Koçla çalışan danışanlar için dashboard ve antrenman sayfası güncellendi. ① **`coachPlan` widget'ı** (2 sütun, üst sıra): koçun aktif planı (başlık + gövde ön izleme) + son koç yorumu. Koç bağlı değilse widget otomatik gizlenir. ② **Antrenman sayfası**: program yoksa ve koça bağlıysa "AI ile oluştur" yerine "Koçun programını bekliyor" mesajı + Planımı görüntüle linki. ③ **`nextWorkout` widget**: program yoksa ve koça bağlıysa "Koçunuz henüz program oluşturmadı" + plan linki. ④ Program başlığında `source="coach"` → "Koç" rozeti (yeşil). ⑤ `dashboard-data.ts`'ye koç verisi eklendi: `getClientCoachInfo` + aktif plan + son koç yorumu. ⑥ **Admin debug endpoint** (`GET /api/admin/debug`): koç bağlantısı, senkron geçmişi, son antrenmanlar, aktif program — oturum korumalı, DB durumunu curl/tarayıcı ile kontrol etmeyi sağlar.
+- **Resend ile koç haftalık hatırlatma e-postası** ✅ (2026-08-28, PR #27): Koçlara her Pazartesi sabahı (09:00 İstanbul / 06:00 UTC) haftalık danışan özet e-postası gönderilir. ① **`src/lib/email.ts`** — Resend client wrapper (FROM adresi `EMAIL_FROM` env ile değiştirilebilir, varsayılan Resend sandbox). ② **`src/app/api/cron/coach-reminder/route.ts`** — Vercel Cron endpoint: tüm koçları bulur, her birinin aktif danışanlarını toplar; danışan başına: haftalık tamamlanan antrenman, son senkron, aktif program var mı, aktif plan başlığı, son ağırlık. HTML e-posta: danışan tablosu + "Program yok" uyarı kutusu (CTA) + "Paneli Aç" butonu. `CRON_SECRET` Bearer token ile korunur. ③ **`vercel.json`** — `crons` array eklendi (`0 6 * * 1`). ④ **`.env.example`** — `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET` eklendi. **Resend free tier:** 100 e-posta/gün, 3000/ay — mevcut ölçekte fazlasıyla yeterli. **Kurulum:** Vercel dashboard'da `RESEND_API_KEY` ve `CRON_SECRET` env var'ları eklenmeli.
 - **Fix: zamana göre selamlama** ✅ (2026-08-28, PR #24): Dashboard'da sabit "Günaydın" yerine saate göre: 05-12 → "Günaydın", 12-18 → "İyi günler", 18-05 → "İyi akşamlar". `dashboard-grid.tsx`.
 - **Mi Scale 2 BLE iyileştirmeleri** ✅ (2026-08-28, PR #20–#22): ① `readValue()` → `startNotifications()` (Mi Scale 2 body composition'ı notification olarak gönderiyor, doğrudan read desteklemiyor — "GATT operation not permitted" düzeldi). ② Birim algılama: catty/jin yanlışlıkla lbs olarak okunuyordu (97.5 kg → 88.5 kg hatası düzeldi). BLE frame'inden ölçüm zamanı çıkarılıyor. ③ Biyometri sayfasına ölçüm silme (çift tıkla onay, `DELETE /api/biometric/[id]`). ④ Ayarlar → Apple Health kartına **manuel JSON yükleme** (sürükle-bırak, `POST /api/ingest/health/manual` — oturum korumalı, token gerektirmez). ⑤ GATT hatası Türkçe kullanıcı dostu mesajla açıklanıyor; iptal sessiz. ⑥ "Yakılan" → "Toplam harcama" (bazal+aktif toplam). 60 sn BLE timeout, bekleme UI, temiz bağlantı kapatma.
 - **Dashboard gerçek yakılan kalori** ✅ (2026-08-28, PR #19): "Yakılan kalori" sabit TDEE (~2850) gösteriyordu → artık **günlük bazal+aktif** gerçek değer. ① `DailyLog.basalKcal` alanı + migration. ② `health-import.ts` basal_energy_burned / resting_energy ingest (kJ→kcal). ③ `dashboard-data.ts` burned = basalKcal + activeKcal (Apple bazal yoksa Katch-McArdle BMR fallback; veri yoksa null — çizgi kırılır). ④ `CalorieBalanceChart` günlük alınan (bar) vs harcanan (çizgi), tooltip'te günlük denge.
@@ -212,6 +215,9 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (prod anahtarları Vercel'de)
 - `TDEE_WINDOW_DAYS="21"` · `NEXT_PUBLIC_APP_NAME="MetaCoach"`
 - `APP_BASE_URL` (prod: `https://metacoach-three.vercel.app`)
+- `RESEND_API_KEY` — Resend e-posta servisi (koç hatırlatma, free tier 100/gün)
+- `EMAIL_FROM` — gönderici adresi (varsayılan: `MetaCoach <onboarding@resend.dev>`, custom domain ile değiştirilebilir)
+- `CRON_SECRET` — Vercel Cron endpoint güvenliği (`openssl rand -base64 33`)
 - Opsiyonel (prod): `R2_*`/`S3_*` (object storage), `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`
 
 ---
