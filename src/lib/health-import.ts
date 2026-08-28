@@ -249,11 +249,14 @@ export async function applyHealthImport(
     const day = startOfDay(start);
     const dayEnd = new Date(day.getTime() + 86_400_000);
 
-    // Aynı güne planlı, henüz tamamlanmamış bir seans varsa onu tamamla.
+    // Aynı güne planlı, henüz tamamlanmamış ve aynı dayType'a sahip bir seans
+    // varsa onu tamamla. dayType eşleşmesi zorunlu — yoksa bir yürüyüş, planlı
+    // kuvvet seansını yanlışlıkla tamamlayabilir.
     const planned = await prisma.workoutSession.findFirst({
       where: {
         userId,
         scheduledFor: { gte: day, lt: dayEnd },
+        dayType: w.dayType,
         status: { not: "completed" },
         source: { not: "imported" },
       },
