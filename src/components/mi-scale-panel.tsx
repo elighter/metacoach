@@ -68,16 +68,37 @@ export function MiScalePanel({
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService(MI_SCALE_BLE.bodyCompositionService);
       const ch = await service.getCharacteristic(MI_SCALE_BLE.bodyCompositionMeasurement);
-      const value: DataView = await ch.readValue();
-      const bytes = new Uint8Array(value.buffer);
-      const reading = parseMiScalePayload(bytes);
-      if (!reading || !reading.impedance) throw new Error("Ölçüm okunamadı — tartıya çıplak ayakla tekrar çıkın.");
+
+      const reading = await new Promise<{ weightKg: number; impedance: number }>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ch.stopNotifications().catch(() => {});
+          reject(new Error("60 saniye içinde ölçüm alınamadı. Tartıya çıplak ayakla çıkıp impedans ölçümünün (ekranda yükleme çubuğu) bitmesini bekleyin."));
+        }, 60_000);
+
+        ch.addEventListener("characteristicvaluechanged", (e: Event) => {
+          const target = e.target as any;
+          const value = target.value as DataView | undefined;
+          if (!value) return;
+          const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+          const parsed = parseMiScalePayload(bytes);
+          if (!parsed) return;
+          if (parsed.stabilized && parsed.impedanceReady && parsed.impedance) {
+            clearTimeout(timeout);
+            ch.stopNotifications().catch(() => {});
+            server.disconnect();
+            resolve({ weightKg: parsed.weightKg, impedance: parsed.impedance });
+          }
+        });
+        ch.startNotifications().catch((err: Error) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
+
       await post(reading.weightKg, reading.impedance, "ble");
     } catch (e: any) {
       const msg = String(e?.message ?? "");
-      if (msg.includes("GATT") || msg.includes("not permitted") || msg.includes("not allowed")) {
-        setError("Tartıyla bağlantı kuruldu ancak veri okunamadı. Tartıya çıplak ayakla çıkıp impedans ölçümünün tamamlanmasını bekleyin, ardından tekrar deneyin.");
-      } else if (msg.includes("cancelled") || msg.includes("canceled") || msg.includes("User cancelled")) {
+      if (msg.includes("cancelled") || msg.includes("canceled") || msg.includes("User cancelled")) {
         setError(null);
       } else {
         setError(msg || "Bluetooth bağlantısı başarısız.");
@@ -117,7 +138,7 @@ export function MiScalePanel({
         </button>
         <button className="btn" onClick={connectBle} disabled={busy !== null}>
           {busy === "ble" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bluetooth className="h-4 w-4" />}
-          Bluetooth ile bağlan
+          {busy === "ble" ? "Ölçüm bekleniyor…" : "Bluetooth ile bağlan"}
         </button>
       </div>
       <p className="mt-2 text-xs text-ink-3">
