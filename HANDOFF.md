@@ -3,7 +3,7 @@
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
 > **Backlog:** öncelikli olmayan fikirler `BACKLOG.md`'de (zengin sağlık widget'ları, motto, koç şablonları vb.).
 > **Koç program builder** artık takvim/hafta görünümü (gün-şeridi + seçili gün editörü).
-> Tarih: 2026-08-25 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Onboarding, Help FAB, AI meal photo parse, Antrenman modülü, Ön Değerlendirme (`/assessment`) + galeri fix'i (PR #2/#3 master'da). **Son (branch'te, merge bekliyor):** Wearable aktivite otomasyonu — Apple Health/Technogym → webhook (`/api/ingest/health`) → DailyLog/WorkoutSession + otomatik activityBase kalibrasyonu. Manuel antrenman girişini ortadan kaldırır.
+> Tarih: 2026-08-28 · Durum: **Faz 0–4B tamamlandı, master'da, CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby) deploy edildi. Wearable otomasyon canlı (Health Auto Export → webhook). Mi Scale 2 BLE entegrasyonu düzeltildi ve doğru çalışıyor. PR #19-23 merge edildi.
 
 ---
 
@@ -90,7 +90,8 @@ src/
       auth/[...nextauth]/     # NextAuth handlers
       register/               # kayıt
       ingest/ ingest/confirm/ # parse + onaylı kaydet
-      mi-scale/reading/       # tartı ölçümü → kompozisyon
+      mi-scale/reading/       # tartı ölçümü → kompozisyon (measuredAt destekli)
+      biometric/[id]/         # biyometrik ölçüm silme (DELETE, ownership check)
       foods/ meals/ meals/[id]/ meals/parse/
       metabolism/recompute/
       profile/ settings/
@@ -98,6 +99,7 @@ src/
       workouts/generate/ workouts/session/[id]/ workouts/set/[id]/  # antrenman
       assessment/             # ön değerlendirme upsert (POST, zod, taslak/gönder)
       ingest/health/          # wearable webhook (Bearer token, session'sız)
+      ingest/health/manual/   # manuel JSON import (session korumalı, aynı pipeline)
       settings/health-token/  # ingest token (yeniden) üret (session korumalı)
       push/subscribe/ push/test/   # web push
       health/                 # DB ping, auth'suz
@@ -107,7 +109,8 @@ src/
     dashboard/dashboard-grid.tsx  # dnd-kit sürükle-sırala + widget aç/kapat + kalıcılık
     dashboard/widgets.tsx     # tüm widget render'ları
     charts.tsx                # Recharts: WeightEnergyChart, TdeeHistoryChart, Ring, Sparkline
-    mi-scale-panel.tsx        # Web Bluetooth + simülatör
+    mi-scale-panel.tsx        # Web Bluetooth (notification-based) + simülatör
+    biometric-history.tsx     # ölçüm geçmişi tablosu (client, silme destekli)
     onboarding.tsx            # 5 adımlı wizard (localStorage ile ilk giriş takibi)
     help-fab.tsx              # sağ alt köşe floating yardım butonu + accordion panel
     nutrition-client.tsx      # öğün listesi + fotoğraf AI parse (kamera+galeri ayrı input) + manuel arama
@@ -143,6 +146,7 @@ prisma/migrations/0_init/     # Postgres init migration (14 tablo)
 prisma/migrations/20260825110158_add_workout_module/   # antrenman tabloları
 prisma/migrations/20260825120000_add_coach_assessment/ # CoachAssessment tablosu
 prisma/migrations/20260825130000_add_health_ingest/    # HealthIngestToken + activityAuto + WorkoutSession.source
+prisma/migrations/20260826160000_add_dailylog_basal/   # DailyLog.basalKcal alanı
 prisma/seed.ts                # Emre + 28 gün geçmiş + lab + öğünler + Mi Scale ölçümleri (+bcrypt şifre)
 scripts/set-db-provider.mjs   # DATABASE_URL'den provider otomatik ayar
 .github/workflows/ci.yml      # typecheck + lint + build + Postgres migrate smoke
@@ -174,11 +178,17 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Aktivite görünürlüğü** ✅ (2026-08-26, master'da PR #8): Apple Health verisi artık görünür — ① Dashboard **"Aktivite" widget'ı** (bugün/7g aktif kalori + adım, aktif-kalori sparkline, son antrenman, bağlı rozeti); ② Antrenman sayfasında **"Son antrenmanlar"** listesi (tamamlanan seanslar, Apple Health'ten gelenler "Apple Health" rozetli); ③ Dashboard adaptif öneride **kalibrasyon notu** (`aktivite: <activityBase> · Apple Health`). `dashboard-data.ts` `activity` + `recentWorkouts` döndürüyor. Önceden veri yazılıyor ama hiçbir ekranda gösterilmiyordu.
 - **Ön-lansman Sprint 1 (UX cilası)** ✅ (2026-08-26, master'da PR #7): ① **Menü sadeleştirildi** — birincil (Dashboard/Beslenme/Antrenman/Biyometri) + "Hesap" grubu (Metabolizma/Yükle/Ön Değerlendirme/Profil/Ayarlar) `app-shell.tsx`. ② **Dashboard yerleşimi** — widget span'leri 1/2/4'e normalize edildi (3 kaldırıldı, grafik tam genişlik), kartlara `h-full` (satır yükseklikleri eşit) → boşluk/hizalama düzeldi. ③ **Gün bazlı kalori** — Dashboard'a `weeklyBalance` widget'ı (alınan bar vs TDEE çizgisi, `CalorieBalanceChart`); Beslenme sayfasına **son 14 günün gün-gün geçmişi** (açılır kart, günlük toplam + öğünler). Karar: kullanıcı testi öncesi Sprint 1 = madde 1-2-3; **Sprint 2 = koç/PT rolü** (hafif MVP: koç girişi + plan/yorum + modül izinleri) — henüz başlanmadı.
 - **Wearable aktivite otomasyonu** ✅ (2026-08-26, PR #4/#5/#6 master'da, **prod'da uçtan uca doğrulandı**: Health Auto Export → webhook `ok:true`, activityBase kalibre oldu; adaptör gerçek HAE şemasına göre düzeltildi — kJ→kcal, saniye→dk, TR workout tipleri): Manuel antrenman girişi TDEE'yi beslemiyordu (yüksek efor/sıfır fayda) → çözüm: aktiviteyi otomatik akıt. **Karar:** Apple Health tek toplama merkezi (Watch + Technogym oraya senkron), oradan push webhook. **Mimari:** `HealthIngestToken` (kullanıcı başına gizli token) → `POST /api/ingest/health` (Bearer token, session'sız, `PUBLIC_PREFIXES`'te) → `lib/health-import.ts` adaptörü (Health Auto Export JSON + generic/Kısayol biçimi, biçim-toleranslı) → `DailyLog.activeKcal/steps` upsert + `WorkoutSession(source="imported", completed)`; o güne planlı seans varsa onu oto-tamamlar (elle set işaretleme biter). `lib/activity-calibration.ts` son 28 günün aktif kalori/adımından `activityBase`'i otomatik türetir (`User.activityAuto` ile override edilebilir); **yakılan kalori TDEE'ye/hedefe EKLENMEZ** (çift sayma yok). Ayarlar'da "Apple Health & Aktivite" kartı: webhook URL + token + kurulum adımları + yenile. Adaptör fixture testi geçti (HAE + generic). **Not:** Apple tam export'u (`dışa aktarılan.xml`) 671 MB — webhook'a uygun değil; sadece nadir/yerel geçmiş dolgusu (henüz yok). Kullanıcının iOS tarafını (Health Auto Export app veya Kısayol) kurması gerekiyor; gerçek payload ile alan eşlemesi son kez teyit edilecek. `source` alanı `WorkoutSession`'a eklendi.
+- **Günlük yakılan kalori düzeltmesi** ✅ (2026-08-27, PR #19): Dashboard "Yakılan" metriği sabit TDEE gösteriyordu → artık gün bazında `basalKcal + activeKcal` kullanılıyor. `DailyLog.basalKcal` alanı eklendi (migration `20260826160000_add_dailylog_basal`), HAE adaptörü "Resting Energy"/"Dinlenme Enerjisi" metriğini bu alana yazıyor. Dashboard veri toplayıcısı (`dashboard-data.ts`) ve TDEE motoru (`tdee.ts`) per-day yakılan kalori hesabına güncellendi.
+- **BLE bildirim tabanlı okuma** ✅ (2026-08-27, PR #21): Mi Scale BLE bağlantısı `readValue()` yerine `startNotifications()` kullanıyor — tartı 3–8 sn boyunca birden fazla frame gönderiyor, `readValue` tek anlık veri alıyordu. Artık `characteristicvaluechanged` event'leri dinleniyor; stabilize + impedans hazır olunca sonuç alınıyor. GATT hata mesajı iyileştirildi.
+- **Mi Scale ağırlık doğruluğu düzeltmesi** ✅ (2026-08-28, PR #22): BLE payload unit detection hatası — catty/jin modu (ctrl0 bit0=0) lbs hesabına (`raw/100 * 0.4536`) düşüyordu → 97.5 kg yerine 88.5 kg gösteriyordu. Üç mod doğru ayrıştırıldı: catty/jin (`raw/200`), kg (`raw/200`), lbs (`raw/100 * 0.4536`). Timestamp extraction eklendi (bytes 2-8 → `measuredAt`). **`parseMiScalePayload`** artık `MiScaleReading.measuredAt: Date | null` döndürüyor; BLE panel ve API bu alanı uçtan uca taşıyor.
+- **Biyometrik ölçüm silme** ✅ (2026-08-28, PR #22): `BiometricHistory` client component'i (double-click-to-confirm silme butonu, hover'da görünür, ilk tıkta kırmızıya döner). `DELETE /api/biometric/[id]` endpoint'i (user ownership doğrulamalı). Hatalı Mi Scale okumalarını düzeltmek için.
+- **Manuel sağlık verisi import'u** ✅ (2026-08-28, PR #22): Ayarlar → Apple Health kartına sürükle-bırak JSON yükleme alanı (`ManualSyncUpload` component). Session-korumalı `POST /api/ingest/health/manual` endpoint'i aynı `applyHealthImport` pipeline'ını kullanır. HAE otomasyonu başarısız olduğunda veya geçmiş veri yüklemesi için fallback. HAE kurulum talimatları "Basal Energy Burned" (Dinlenme Enerjisi) metriğini içerecek şekilde güncellendi.
+- **Antrenman oto-eşleştirme düzeltmesi** ✅ (2026-08-28, PR #23): `dayType` kontrolü eklendi — yürüyüş (cardio) artık planlı kuvvet seansını yanlışlıkla tamamlayamaz. `health-import.ts`'te `WorkoutSession.findFirst` sorgusuna `dayType: w.dayType` eklendi.
 - **Ön Değerlendirme modülü** ✅ (2026-08-25, PR #2 master'a merge — build/lint/typecheck temiz; **prod doğrulaması kullanıcıda**): Antrenör/diyetisyen görüşmesi öncesi 3-bölümlük intake — ① son 2-3 günlük yemek alışkanlıkları (serbest metin), ② kişisel rutin (uyanış/uyku saati + hareket seviyesi), ③ son kan tahlilleri varsa (B12, D vit, açlık insülini, HOMA-IR, TSH → referans aralığına göre düşük/normal/yüksek rozet). `/assessment` sayfası + hazırlık göstergeli form (taslak kaydet / görüşmeye gönder), `CoachAssessment` modeli (kullanıcı başına tek kayıt, upsert), `POST /api/assessment`, nav girişi, demo seed. **Not:** kendini-değerlendirme aracı; referans aralıkları bilgi amaçlı, tanı değil.
 - **Fix: öğün fotoğrafı galeriden yükleme** ✅ (2026-08-25, PR #2): `nutrition-client.tsx` tek `<input capture="environment">` kullanıyordu → mobil tarayıcıyı kameraya zorlayıp galeriyi engelliyordu. Kamera (capture'lı) + galeri (capture'sız) için ayrı input ve "Fotoğraf çek" / "Galeriden yükle" iki buton. (Masaüstünde zaten seçici açılıyordu; asıl etki mobilde.)
 - **Antrenman modülü** ✅ (2026-08-25, tarayıcıda doğrulandı): 4 fazlı periyodizasyon (hazırlık→ana yüklenme→kardiyo→soğuma), 3 gün A/B split (A=kuvvet, B=fonksiyonel). Claude ile kişiye özel program üretimi (strict tool call) + deterministik şablon fallback. 34 egzersizlik salon kütüphanesi. `/workout` sayfası (4 faz akordeonu, set işaretle/ağırlık logla, seansı tamamla), dashboard `nextWorkout` widget'ı, "Antrenman" nav. Adaptif antrenman-günü protein artışı. **Kritik karar:** tahmini yakılan kalori sadece gösterim — Dynamic TDEE'ye BESLENMEZ (çift sayım önlenir; TDEE zaten toplam harcamayı kilo/alım'dan öğreniyor). estKcal doğrulandı (519 kcal / 59 dk).
 
-**Build:** 30+ route + middleware (workout + assessment dahil), tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app`
+**Build:** 30+ route + middleware (workout + assessment + biometric delete + manual import dahil), tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app` — PR #1-23 merge edildi.
 
 ---
 
@@ -240,20 +250,22 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - Güvenlik başlıkları (CSP, HSTS, X-Frame-Options) ✅
 - Next.js 15.5.23 (CVE-2025-66478 fix) ✅
 
-### ⏳ Prod doğrulaması bekleyen (2026-08-25, PR #2 merge sonrası)
-- **Ön Değerlendirme (`/assessment`)** — merge edildi, Vercel deploy tetiklendi; canlıda kullanıcı doğrulaması bekleniyor.
-- **Öğün fotoğrafı galeriden yükleme** — aynı deploy. Kullanıcı ilk kontrolde "durum aynı" dedi; bunun nedeni değişikliğin o an sadece feature dalında olmasıydı (master'a merge edilmemişti). PR #2 ile master'a alındı. Mobilde hâlâ eskiyse **PWA/service-worker cache** şüphesi — hard-refresh / uygulamayı kapat-aç.
-- **Migration:** `20260825120000_add_coach_assessment` prod build'de `prisma migrate deploy` ile Neon'a uygulanır — deploy loglarında doğrulanmalı.
+### Prod'da doğrulanmış (2026-08-28, PR #19-23 merge sonrası)
+- **Mi Scale 2 BLE** — ağırlık doğru (97.5 kg), bildirim tabanlı okuma, timestamp extraction, biometrik silme ✅
+- **HAE webhook** — aktif kalori, adım, antrenman, basalKcal akıyor; dayType eşleştirme düzeltildi ✅
+- **Manuel import** — Ayarlar'dan JSON sürükle-bırak çalışıyor ✅
+- **Migration'lar:** `20260826160000_add_dailylog_basal` prod'da uygulandı ✅
 
 ---
 
 ## 11. Sıradaki
 
+- **HAE'de "Dinlenme Enerjisi" (Basal Energy Burned) metriği aktifleştirme** — kullanıcı HAE ayarlarında bu metriği henüz açmamış olabilir; `basalKcal` verisi bu metriğe bağlı
+- **Beslenme değerlendirmesi (Nutrition Routine Assessment)** — kullanıcının beslenme düzenini sistematik değerlendirme
 - **Custom domain** opsiyonel — Cloudflare/Namecheap ~$10/yıl
 - **R2 object storage** — orijinal dosyaların saklanması (Cloudflare R2 free tier 10GB)
 - **Sentry** — error monitoring (free tier)
 - **Yiyecek veritabanı** — prod'da FoodItem tablosu boş, seed veya toplu import gerekli (manuel arama için)
-- **Wearable senkron** — Terra/Vital (Apple Health + Garmin)
 - **OAuth/email verify** + şifre sıfırlama
 - **KVKK/GDPR** — aydınlatma metni, VERBİS, denetim logu, rıza, veri dışa aktarım/silme
 - **Pentest + CSP nonce**
