@@ -10,6 +10,7 @@ const PUBLIC_PREFIXES = [
   "/api/register",
   "/api/health",
   "/api/ingest/health",
+  "/api/cron/",
 ];
 
 export const authConfig = {
