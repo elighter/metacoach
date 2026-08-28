@@ -98,7 +98,9 @@ const flagPill: Record<string, string> = {
 const flagText: Record<string, string> = { normal: "Normal", high: "Yüksek", low: "Düşük" };
 
 export function DashboardWidget({ id, data }: { id: string; data: DashboardData }) {
-  const { tdee, mifflin, latestBio, chart, consumed, target, macroTarget, lab, weightDelta, windowDays, goal } = data;
+  const { tdee, mifflin, latestBio, chart, consumed, nutritionDay, target, macroTarget, lab, weightDelta, windowDays, goal } = data;
+  const isYesterdayNutrition = nutritionDay === "yesterday";
+  const isYesterdayActivity = data.activity.day === "yesterday";
 
   const trendSeries = chart.map((c) => c.trend).filter((v): v is number => v != null);
   const calSeries = chart.map((c) => c.calories).filter((v): v is number => v != null).slice(-8);
@@ -152,10 +154,10 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
         <Kpi
           icon={Flame}
           tint="var(--warn-wash)"
-          label="Bugün alınan"
+          label={isYesterdayNutrition ? "Dün alınan" : "Bugün alınan"}
           value={fmt(consumed.kcal)}
           unit={`/ ${fmt(target)}`}
-          delta={{ text: `${fmt(Math.max(0, target - consumed.kcal))} kcal kaldı`, dir: "flat" }}
+          delta={{ text: isYesterdayNutrition ? "Bugün henüz kayıt yok" : `${fmt(Math.max(0, target - consumed.kcal))} kcal kaldı`, dir: "flat" }}
           spark={<Sparkline data={calSeries} color="var(--warn)" bars />}
         />
       );
@@ -178,12 +180,12 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-border bg-surface-2 p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-ink-3"><Flame className="h-3.5 w-3.5" /> Aktif kalori</div>
+                  <div className="flex items-center gap-1.5 text-xs text-ink-3"><Flame className="h-3.5 w-3.5" /> {isYesterdayActivity ? "Dün aktif" : "Aktif kalori"}</div>
                   <div className="mt-1 text-xl font-bold tabular-nums">{fmt(a.todayActiveKcal)}<span className="ml-1 text-xs font-medium text-ink-3">kcal</span></div>
                   <div className="mt-0.5 text-[0.7rem] text-ink-3">7g ort. {fmt(a.avgActiveKcal)} kcal</div>
                 </div>
                 <div className="rounded-lg border border-border bg-surface-2 p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-ink-3"><Footprints className="h-3.5 w-3.5" /> Adım</div>
+                  <div className="flex items-center gap-1.5 text-xs text-ink-3"><Footprints className="h-3.5 w-3.5" /> {isYesterdayActivity ? "Dün adım" : "Adım"}</div>
                   <div className="mt-1 text-xl font-bold tabular-nums">{fmt(a.todaySteps)}</div>
                   <div className="mt-0.5 text-[0.7rem] text-ink-3">7g ort. {fmt(a.avgSteps)}</div>
                 </div>
@@ -259,7 +261,7 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
       );
     case "energyRing":
       return (
-        <Panel title="Bugünün enerjisi">
+        <Panel title={isYesterdayNutrition ? "Dünün enerjisi" : "Bugünün enerjisi"}>
           <div className="flex items-center gap-4">
             <Ring value={consumed.kcal} max={target} />
             <div className="text-sm">

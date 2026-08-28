@@ -26,18 +26,13 @@ export async function GET() {
   const summaries = [];
   for (const link of links) {
     const clientId = link.client.id;
-    const [workoutCount, program, plan, device, bio] = await Promise.all([
+    const [workoutCount, coachProgram, device, bio] = await Promise.all([
       prisma.workoutSession.count({
         where: { userId: clientId, status: "completed", completedAt: { gte: weekAgo } },
       }),
       prisma.workoutProgram.findFirst({
-        where: { userId: clientId, active: true },
+        where: { userId: clientId, active: true, source: "coach" },
         select: { id: true },
-      }),
-      prisma.trainingPlan.findFirst({
-        where: { clientId, active: true },
-        orderBy: { createdAt: "desc" },
-        select: { title: true },
       }),
       prisma.deviceConnection.findFirst({
         where: { userId: clientId, provider: "apple_health" },
@@ -55,8 +50,7 @@ export async function GET() {
       email: link.client.email,
       workoutsThisWeek: workoutCount,
       lastSyncAt: device?.lastSyncAt ?? null,
-      hasProgram: !!program,
-      activePlan: plan?.title ?? null,
+      hasProgram: !!coachProgram,
       lastWeight: bio?.weightKg ?? null,
     });
   }
@@ -77,7 +71,7 @@ export async function GET() {
   return NextResponse.json({ sent: true, to: user.email, clients: summaries.length });
 }
 
-function buildCoachEmail(coachName: string, clients: { name: string; email: string; workoutsThisWeek: number; lastSyncAt: Date | null; hasProgram: boolean; activePlan: string | null; lastWeight: number | null }[], appUrl: string): string {
+function buildCoachEmail(coachName: string, clients: { name: string; email: string; workoutsThisWeek: number; lastSyncAt: Date | null; hasProgram: boolean; lastWeight: number | null }[], appUrl: string): string {
   const rows = clients
     .map((c) => {
       const syncBadge = c.lastSyncAt

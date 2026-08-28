@@ -19,11 +19,18 @@ export async function getDashboardData(userId: string) {
   });
   const windowDays = user.settings?.tdeeWindowDays ?? 21;
 
-  const [logs, biometrics, todayMeals, lab, estimates] = await Promise.all([
+  const todayStart = startOfDay(new Date());
+  const yesterdayStart = new Date(todayStart.getTime() - 86_400_000);
+
+  const [logs, biometrics, todayMeals, yesterdayMeals, lab, estimates] = await Promise.all([
     prisma.dailyLog.findMany({ where: { userId }, orderBy: { date: "asc" }, take: 90 }),
     prisma.biometric.findMany({ where: { userId }, orderBy: { measuredAt: "asc" } }),
     prisma.meal.findMany({
-      where: { userId, loggedAt: { gte: startOfDay(new Date()) } },
+      where: { userId, loggedAt: { gte: todayStart } },
+      orderBy: { loggedAt: "asc" },
+    }),
+    prisma.meal.findMany({
+      where: { userId, loggedAt: { gte: yesterdayStart, lt: todayStart } },
       orderBy: { loggedAt: "asc" },
     }),
     prisma.labResult.findFirst({
@@ -99,16 +106,16 @@ export async function getDashboardData(userId: string) {
         })
       : null;
 
-  // ── Today's nutrition ──
-  const consumed = todayMeals.reduce(
-    (a, m) => ({
-      kcal: a.kcal + m.totalKcal,
-      protein: a.protein + m.proteinG,
-      carb: a.carb + m.carbG,
-      fat: a.fat + m.fatG,
-    }),
-    { kcal: 0, protein: 0, carb: 0, fat: 0 },
-  );
+  // ── Nutrition: today (or yesterday if today is empty) ──
+  const sumMeals = (meals: typeof todayMeals) =>
+    meals.reduce(
+      (a, m) => ({ kcal: a.kcal + m.totalKcal, protein: a.protein + m.proteinG, carb: a.carb + m.carbG, fat: a.fat + m.fatG }),
+      { kcal: 0, protein: 0, carb: 0, fat: 0 },
+    );
+  const todayConsumed = sumMeals(todayMeals);
+  const hasTodayNutrition = todayConsumed.kcal > 0;
+  const consumed = hasTodayNutrition ? todayConsumed : sumMeals(yesterdayMeals);
+  const nutritionDay: "today" | "yesterday" = hasTodayNutrition || yesterdayMeals.length === 0 ? "today" : "yesterday";
   const target = tdee.tdee + (user.goal === "cut" ? -450 : user.goal === "bulk" ? 300 : 0);
   const macroTarget = {
     protein: Math.round((latestBio?.weightKg ?? 80) * 2),
@@ -142,17 +149,23 @@ export async function getDashboardData(userId: string) {
     completedThisWeek,
   };
 
-  // ── Aktivite (Apple Health / wearable) ──
-  const todayKey = startOfDay(new Date()).getTime();
+  // ── Aktivite (Apple Health / wearable) — bugün boşsa dünü göster ──
+  const todayKey = todayStart.getTime();
+  const yesterdayKey = yesterdayStart.getTime();
   const todayLog = logs.find((l) => startOfDay(l.date).getTime() === todayKey) ?? null;
+  const yesterdayLog = logs.find((l) => startOfDay(l.date).getTime() === yesterdayKey) ?? null;
+  const hasTodayActivity = (todayLog?.activeKcal ?? 0) > 0 || (todayLog?.steps ?? 0) > 0;
+  const displayLog = hasTodayActivity ? todayLog : yesterdayLog;
+  const activityDay: "today" | "yesterday" = hasTodayActivity || !yesterdayLog ? "today" : "yesterday";
   const cutoff7 = daysAgo(7).getTime();
   const last7 = logs.filter((l) => l.date.getTime() >= cutoff7);
   const activeVals = last7.map((l) => l.activeKcal).filter((v) => v > 0);
   const stepVals = last7.map((l) => l.steps).filter((v) => v > 0);
   const activity = {
     hasData: logs.some((l) => l.activeKcal > 0 || l.steps > 0),
-    todayActiveKcal: Math.round(todayLog?.activeKcal ?? 0),
-    todaySteps: todayLog?.steps ?? 0,
+    day: activityDay,
+    todayActiveKcal: Math.round(displayLog?.activeKcal ?? 0),
+    todaySteps: displayLog?.steps ?? 0,
     avgActiveKcal: activeVals.length ? Math.round(activeVals.reduce((s, v) => s + v, 0) / activeVals.length) : 0,
     avgSteps: stepVals.length ? Math.round(stepVals.reduce((s, v) => s + v, 0) / stepVals.length) : 0,
     series: logs.slice(-10).map((l) => Math.round(l.activeKcal ?? 0)),
@@ -185,6 +198,7 @@ export async function getDashboardData(userId: string) {
     biometrics,
     chart,
     consumed,
+    nutritionDay,
     target,
     macroTarget,
     todayMeals,
