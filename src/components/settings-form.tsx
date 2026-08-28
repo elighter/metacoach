@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Loader2, Check, Sun, Moon, Monitor, Bluetooth, Heart, Download, Trash2, ShieldCheck, Activity, Copy, RefreshCw } from "lucide-react";
+import { Save, Loader2, Check, Sun, Moon, Monitor, Bluetooth, Heart, Download, Trash2, ShieldCheck, Activity, Copy, RefreshCw, Upload } from "lucide-react";
 import { fmtDate } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
 import { PushControls } from "@/components/push-controls";
@@ -242,11 +242,13 @@ function AppleHealthCard({ appleHealth }: { appleHealth: AppleHealth }) {
               <li>App Store'dan <b>Health Auto Export – JSON+CSV</b> kur.</li>
               <li><b>Automations → REST API</b> ekle; URL'ye webhook adresini yapıştır.</li>
               <li>Header ekle: <span className="font-mono">Authorization: Bearer &lt;token&gt;</span></li>
-              <li>Metrikler: <b>Active Energy, Step Count, Workouts</b>. Aggregation: <b>Daily</b>, format <b>JSON</b>.</li>
+              <li>Metrikler: <b>Active Energy, Basal Energy Burned, Step Count, Workouts</b>. Aggregation: <b>Daily</b>, format <b>JSON</b>.</li>
               <li>Otomasyonu günlük çalışacak şekilde kaydet.</li>
             </ol>
             <div className="mt-2 text-ink-3">Alternatif: Apple Kısayol ile aynı adrese POST eden bir otomasyon da kullanılabilir.</div>
           </div>
+
+          <ManualSyncUpload />
 
           <div className="flex flex-wrap items-center gap-3">
             <button className="btn" onClick={generate} disabled={busy}>
@@ -262,6 +264,75 @@ function AppleHealthCard({ appleHealth }: { appleHealth: AppleHealth }) {
           <p className="text-xs text-ink-3">
             Token'ı gizli tut; yenilersen eski kurulum çalışmayı durdurur ve adresi güncellemen gerekir.
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManualSyncUpload() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function handleFile(file: File) {
+    setBusy(true);
+    setResult(null);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const res = await fetch("/api/ingest/health/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult({
+          ok: true,
+          msg: `${data.daysWritten} gün + ${data.workoutsCreated} antrenman aktarıldı, ${data.sessionsCompleted} seans tamamlandı.`,
+        });
+        router.refresh();
+      } else {
+        setResult({ ok: false, msg: data.error ?? "İçe aktarma başarısız." });
+      }
+    } catch {
+      setResult({ ok: false, msg: "Dosya okunamadı veya geçersiz JSON." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+    e.target.value = "";
+  }
+
+  return (
+    <div
+      onDrop={onDrop}
+      onDragOver={(e) => e.preventDefault()}
+      className="rounded-lg border-2 border-dashed border-border p-4 text-center transition-colors hover:border-primary/40"
+    >
+      <div className="mb-2 text-sm font-medium text-ink-2">Manuel içe aktarma</div>
+      <p className="mb-3 text-xs text-ink-3">
+        Health Auto Export JSON dosyasını sürükle-bırak veya dosya seç. Otomasyon çalışmadığında ya da geçmiş verini yüklemek istediğinde kullan.
+      </p>
+      <label className="btn btn-primary cursor-pointer inline-flex">
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {busy ? "Aktarılıyor…" : "JSON dosyası seç"}
+        <input type="file" accept=".json,application/json" className="hidden" onChange={onFileInput} disabled={busy} />
+      </label>
+      {result && (
+        <div className={`mt-3 rounded-lg px-3 py-2 text-sm ${result.ok ? "bg-good-wash text-good" : "bg-crit-wash text-crit"}`}>
+          {result.msg}
         </div>
       )}
     </div>
