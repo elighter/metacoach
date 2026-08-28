@@ -26,11 +26,11 @@ export function MiScalePanel({
   const [result, setResult] = useState<MiComposition | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function post(weightKg: number, impedance: number, source: "ble" | "simulated") {
+  async function post(weightKg: number, impedance: number, source: "ble" | "simulated", measuredAt?: string | null) {
     const res = await fetch("/api/mi-scale/reading", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weightKg, impedance, source }),
+      body: JSON.stringify({ weightKg, impedance, source, ...(measuredAt && { measuredAt }) }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Ölçüm kaydedilemedi");
@@ -69,7 +69,7 @@ export function MiScalePanel({
       const service = await server.getPrimaryService(MI_SCALE_BLE.bodyCompositionService);
       const ch = await service.getCharacteristic(MI_SCALE_BLE.bodyCompositionMeasurement);
 
-      const reading = await new Promise<{ weightKg: number; impedance: number }>((resolve, reject) => {
+      const reading = await new Promise<{ weightKg: number; impedance: number; measuredAt: string | null }>((resolve, reject) => {
         const timeout = setTimeout(() => {
           ch.stopNotifications().catch(() => {});
           reject(new Error("60 saniye içinde ölçüm alınamadı. Tartıya çıplak ayakla çıkıp impedans ölçümünün (ekranda yükleme çubuğu) bitmesini bekleyin."));
@@ -86,7 +86,11 @@ export function MiScalePanel({
             clearTimeout(timeout);
             ch.stopNotifications().catch(() => {});
             server.disconnect();
-            resolve({ weightKg: parsed.weightKg, impedance: parsed.impedance });
+            resolve({
+              weightKg: parsed.weightKg,
+              impedance: parsed.impedance,
+              measuredAt: parsed.measuredAt?.toISOString() ?? null,
+            });
           }
         });
         ch.startNotifications().catch((err: Error) => {
@@ -95,7 +99,7 @@ export function MiScalePanel({
         });
       });
 
-      await post(reading.weightKg, reading.impedance, "ble");
+      await post(reading.weightKg, reading.impedance, "ble", reading.measuredAt);
     } catch (e: any) {
       const msg = String(e?.message ?? "");
       if (msg.includes("cancelled") || msg.includes("canceled") || msg.includes("User cancelled")) {
