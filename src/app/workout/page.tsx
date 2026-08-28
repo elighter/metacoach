@@ -16,10 +16,10 @@ export default async function WorkoutPage() {
   const coachInfo = await getClientCoachInfo(user.id);
   const hasCoach = !!coachInfo.coach;
 
-  const [program, sessions, bio, recent] = await Promise.all([
+  const [rawProgram, sessions, bio, recent] = await Promise.all([
     prisma.workoutProgram.findFirst({ where: { userId: user.id, active: true } }),
     prisma.workoutSession.findMany({
-      where: { userId: user.id, scheduledFor: { gte: today } },
+      where: { userId: user.id, scheduledFor: { gte: today }, source: hasCoach ? "coach" : undefined },
       orderBy: { scheduledFor: "asc" },
       include: {
         sets: {
@@ -29,13 +29,14 @@ export default async function WorkoutPage() {
       },
     }),
     prisma.biometric.findFirst({ where: { userId: user.id }, orderBy: { measuredAt: "desc" }, select: { weightKg: true } }),
-    // Son tamamlanan seanslar (Apple Health'ten içe alınanlar dahil)
     prisma.workoutSession.findMany({
-      where: { userId: user.id, status: "completed", completedAt: { gte: daysAgo(21) } },
+      where: { userId: user.id, status: "completed", completedAt: { gte: daysAgo(21) }, source: hasCoach ? "coach" : undefined },
       orderBy: { completedAt: "desc" },
       take: 12,
     }),
   ]);
+
+  const program = hasCoach && rawProgram?.source !== "coach" ? null : rawProgram;
 
   // Today's (or next) actionable session = first not-yet-completed upcoming one.
   const current = sessions.find((s) => s.status !== "completed") ?? sessions[0] ?? null;
