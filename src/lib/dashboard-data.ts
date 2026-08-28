@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { computeTdee, ewmaSeries, mifflinStJeor, type DailyPoint } from "@/lib/tdee";
 import { ageFromDob, startOfDay, daysAgo } from "@/lib/utils";
+import { getClientCoachInfo } from "@/lib/coach";
 
 export interface ChartPoint {
   date: string; // ISO day
@@ -169,6 +170,32 @@ export async function getDashboardData(userId: string) {
     estKcal: s.estKcal,
   }));
 
+  // ── Koç verileri (plan, son yorum, koç adı) ──
+  const coachInfo = await getClientCoachInfo(userId);
+  const [activePlan, lastCoachComment] = await Promise.all([
+    coachInfo.coach
+      ? prisma.trainingPlan.findFirst({
+          where: { clientId: userId, active: true },
+          orderBy: { createdAt: "desc" },
+          select: { title: true, body: true, createdAt: true },
+        })
+      : Promise.resolve(null),
+    coachInfo.coach
+      ? prisma.coachComment.findFirst({
+          where: { clientId: userId, authorRole: "coach" },
+          orderBy: { createdAt: "desc" },
+          select: { body: true, createdAt: true },
+        })
+      : Promise.resolve(null),
+  ]);
+  const coach = coachInfo.coach
+    ? {
+        name: coachInfo.coach.name,
+        plan: activePlan,
+        lastComment: lastCoachComment,
+      }
+    : null;
+
   // Weight change over window
   const firstTrend = weightPts.length ? trendMap.get(startOfDay(weightPts[0].date).getTime()) : null;
   const lastTrend = tdee.trendWeightKg;
@@ -194,6 +221,7 @@ export async function getDashboardData(userId: string) {
     workout,
     activity,
     recentWorkouts,
+    coach,
   };
 }
 

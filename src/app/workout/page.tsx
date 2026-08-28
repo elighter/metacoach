@@ -3,6 +3,7 @@ import { startOfDay, daysAgo, fmt, fmtDate } from "@/lib/utils";
 import { PHASE_LABEL, PHASE_HINT, type Phase } from "@/lib/workout-library";
 import { trainingDayProtein, type DayType, type Goal } from "@/lib/workout";
 import { WorkoutClient, type SessionView } from "@/components/workout-client";
+import { getClientCoachInfo } from "@/lib/coach";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,9 @@ const PHASE_ORDER: Phase[] = ["activation", "strength", "functional", "cardio", 
 export default async function WorkoutPage() {
   const user = await getCurrentUser();
   const today = startOfDay(new Date());
+
+  const coachInfo = await getClientCoachInfo(user.id);
+  const hasCoach = !!coachInfo.coach;
 
   const [program, sessions, bio, recent] = await Promise.all([
     prisma.workoutProgram.findFirst({ where: { userId: user.id, active: true } }),
@@ -98,6 +102,7 @@ export default async function WorkoutPage() {
         current={currentView}
         upcoming={upcoming}
         proteinNote={proteinNote}
+        hasCoach={hasCoach}
       />
 
       {recent.length > 0 && (

@@ -9,6 +9,7 @@ export interface WidgetDef {
 }
 
 export const WIDGETS: WidgetDef[] = [
+  { id: "coachPlan", title: "Koç planı", description: "Koçunuzun güncel planı ve notları", colSpan: 2 },
   { id: "tdee", title: "Dynamic TDEE", description: "Öğrenilen metabolizma hızı", colSpan: 1 },
   { id: "weight", title: "Ağırlık trendi", description: "EWMA yumuşatılmış", colSpan: 1 },
   { id: "bodyfat", title: "Vücut yağı", description: "Son ölçüm", colSpan: 1 },

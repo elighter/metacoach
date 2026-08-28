@@ -42,6 +42,7 @@ interface Props {
   current: SessionView | null;
   upcoming: { id: string; label: string; status: string; scheduledFor: string }[];
   proteinNote: string | null;
+  hasCoach?: boolean;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -51,7 +52,7 @@ const STATUS_LABEL: Record<string, string> = {
   skipped: "Atlandı",
 };
 
-export function WorkoutClient({ program, current, upcoming, proteinNote }: Props) {
+export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoach }: Props) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [sets, setSets] = useState<Record<string, { done: boolean; weightKg: number | null }>>(
@@ -132,6 +133,22 @@ export function WorkoutClient({ program, current, upcoming, proteinNote }: Props
 
   // ── Empty state: no program yet ──
   if (!program || !current) {
+    if (hasCoach) {
+      return (
+        <div className="mt-6 card p-8 text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary/10">
+            <Dumbbell className="h-6 w-6 text-primary-ink" />
+          </div>
+          <h2 className="mt-4 text-lg font-semibold">Koçun programını bekliyor</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-ink-3">
+            Koçun henüz bir antrenman programı oluşturmadı. Programın hazır olduğunda burada görünecek.
+          </p>
+          <a href="/plan" className="btn-primary mx-auto mt-5 inline-flex items-center gap-2">
+            Planımı görüntüle →
+          </a>
+        </div>
+      );
+    }
     return (
       <div className="mt-6 card p-8 text-center">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary/10">
@@ -161,9 +178,11 @@ export function WorkoutClient({ program, current, upcoming, proteinNote }: Props
               <h2 className="text-base font-semibold">{program.name}</h2>
               <span className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                program.source === "ai" ? "bg-primary/10 text-primary-ink" : "bg-ink/5 text-ink-3",
+                program.source === "ai" ? "bg-primary/10 text-primary-ink"
+                  : program.source === "coach" ? "bg-good-wash text-good"
+                  : "bg-ink/5 text-ink-3",
               )}>
-                {program.source === "ai" ? "AI" : "Şablon"}
+                {program.source === "ai" ? "AI" : program.source === "coach" ? "Koç" : "Şablon"}
               </span>
             </div>
             {program.notes && <p className="mt-1 max-w-xl text-sm text-ink-3">{program.notes}</p>}

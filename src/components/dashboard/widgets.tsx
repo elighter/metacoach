@@ -14,6 +14,8 @@ import {
   Wheat,
   Nut,
   Dumbbell,
+  UserCheck,
+  MessageSquare,
 } from "lucide-react";
 import type { DashboardData } from "@/lib/dashboard-data";
 import { Sparkline, WeightEnergyChart, CalorieBalanceChart, Ring } from "@/components/charts";
@@ -345,6 +347,42 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
           </div>
         </Panel>
       );
+    case "coachPlan": {
+      const c = data.coach;
+      if (!c) return null;
+      return (
+        <Panel
+          title="Koç planı"
+          sub={c.name}
+          right={<UserCheck className="h-4 w-4 text-primary-ink" />}
+        >
+          {c.plan ? (
+            <a href="/plan" className="block">
+              <div className="text-base font-semibold">{c.plan.title}</div>
+              <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-ink-2">
+                {c.plan.body}
+              </div>
+              <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-ink">
+                Planı aç →
+              </div>
+            </a>
+          ) : (
+            <div className="text-sm text-ink-3">Koçun henüz bir plan girmedi.</div>
+          )}
+          {c.lastComment && (
+            <div className="mt-3 border-t border-border/60 pt-2.5">
+              <div className="flex items-start gap-2 text-xs text-ink-2">
+                <MessageSquare className="mt-0.5 h-3 w-3 shrink-0 text-ink-3" />
+                <div className="min-w-0">
+                  <span className="line-clamp-2">{c.lastComment.body}</span>
+                  <div className="mt-0.5 text-ink-3">{fmtDate(c.lastComment.createdAt)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </Panel>
+      );
+    }
     case "nextWorkout": {
       const w = data.workout;
       return (
@@ -357,6 +395,13 @@ export function DashboardWidget({ id, data }: { id: string; data: DashboardData 
               </div>
               <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-ink">
                 Seansı aç →
+              </div>
+            </a>
+          ) : data.coach ? (
+            <a href="/plan" className="block">
+              <div className="text-sm text-ink-2">Koçunuz henüz program oluşturmadı.</div>
+              <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-ink">
+                Planı görüntüle →
               </div>
             </a>
           ) : (
