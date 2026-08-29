@@ -11,7 +11,7 @@ export async function sendEmail(opts: {
   subject: string;
   html: string;
 }) {
-  const from = process.env.EMAIL_FROM ?? "MetaCoach <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM ?? "MetaCoach <noreply@metacoachhealth.com>";
   return getResend().emails.send({
     from,
     to: opts.to,

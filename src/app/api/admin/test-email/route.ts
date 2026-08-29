@@ -61,7 +61,7 @@ export async function GET() {
     });
   }
 
-  const appUrl = process.env.APP_BASE_URL ?? "https://metacoach-three.vercel.app";
+  const appUrl = process.env.APP_BASE_URL ?? "https://metacoachhealth.com";
   const html = buildCoachEmail(coach.name, summaries, appUrl);
 
   const result = await sendEmail({

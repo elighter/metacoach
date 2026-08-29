@@ -16,7 +16,7 @@ kilo/yağ değişiminden **gerçek metabolizma hızını (Dynamic TDEE) öğreni
 kart tabanlı, dark/light, **kullanıcının özelleştirebildiği** dashboard.
 
 **Konum:** `/Users/emrecakmak/Projects/MetaCoach` · **GitHub:** private repo `github.com/elighter/metacoach` — **her şey `master`'da**. CI yeşil (typecheck/lint/build + Postgres migrate + GitGuardian). Makine kapalıyken **Claude Code web** (claude.ai/code) ile devam edilebilir.
-**Prod URL:** `https://metacoach-three.vercel.app` · **Neon:** Frankfurt (eu-central-1)
+**Prod URL:** `https://metacoachhealth.com` (eski: `metacoach-three.vercel.app`) · **Neon:** Frankfurt (eu-central-1)
 > Not: Bu makinede `gh` kimliği macOS keyring'de — Bash aracı git/gh komutlarını **sandbox kapalı** çalıştırmalı, yoksa auth görünmez.
 **Görsel tasarım dokümanı (artifact):** https://claude.ai/code/artifact/0ea09d80-710a-4d0d-94f1-f81156dc8f4d
 
@@ -267,18 +267,17 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - Güvenlik başlıkları (CSP, HSTS, X-Frame-Options) ✅
 - Next.js 15.5.23 (CVE-2025-66478 fix) ✅
 
-### ⏳ Domain & e-posta altyapısı (2026-08-29, devam ediyor)
-- **Domain:** `metacoachhealth.com` Cloudflare Registrar'dan satın alındı (Active)
-- **Sorun:** Resend sandbox (`onboarding@resend.dev`) yalnızca hesap sahibi (emrecakmak@me.com) adresine gönderebiliyor → koç e-postası (zehraogul95@gmail.com) 403 alıyor. Vercel'de SMTP (port 587/465) engellendiği için Nodemailer çalışmıyor — **SMTP kodu kaldırıldı**.
-- **Çözüm:** Cloudflare'da domain → Resend'e ekle → DNS (SPF/DKIM/DMARC) doğrula → `noreply@metacoachhealth.com` olarak herhangi bir adrese e-posta gönder
-- **Kalan adımlar:**
-  1. Resend → Domains → `metacoachhealth.com` ekle → DNS kayıtlarını al
-  2. Cloudflare DNS'e SPF, DKIM (3 kayıt), DMARC ekle
-  3. Vercel'e custom domain ekle → Cloudflare'da CNAME yapılandır
-  4. Vercel env: `EMAIL_FROM=MetaCoach <noreply@metacoachhealth.com>`, `APP_BASE_URL=https://metacoachhealth.com`
-  5. Vercel'den SMTP_* env var'larını sil (artık gereksiz)
-  6. Coach-reminder cron'u tetikle → koça düzeltilmiş e-posta gönder
-- **Kod hazır:** `email.ts` Resend-only (nodemailer/SMTP kaldırıldı), `.env.example` SMTP satırları kaldırıldı
+### ✅ Domain & e-posta altyapısı (2026-08-29)
+- **Domain:** `metacoachhealth.com` — Cloudflare Registrar (Active) + Resend domain verified (EU/Ireland)
+- **DNS:** SPF + DKIM + MX otomatik yapılandırıldı (Resend ↔ Cloudflare auto-configure)
+- **E-posta:** `noreply@metacoachhealth.com` — artık herhangi bir adrese gönderebilir (sandbox sınırlaması aşıldı)
+- **Kod:** `email.ts` Resend-only, fallback from adresi `noreply@metacoachhealth.com`, appUrl default'ları güncellendi
+- **Kalan:**
+  1. ~~Resend domain doğrulama~~ ✅
+  2. Vercel'e custom domain ekle → Cloudflare'da CNAME yapılandır
+  3. Vercel env: `EMAIL_FROM=MetaCoach <noreply@metacoachhealth.com>`, `APP_BASE_URL=https://metacoachhealth.com`
+  4. Vercel'den SMTP_* env var'larını sil
+  5. Deploy + coach-reminder cron'u tetikle
 
 ### ⏳ Prod doğrulaması bekleyen (2026-08-28)
 - **Mi Scale 2 BLE (notification tabanlı okuma + kilo doğruluğu)** — PR #21-#22, canlıda gerçek tartı ile test bekleniyor.
