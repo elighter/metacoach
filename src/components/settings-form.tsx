@@ -9,6 +9,9 @@ import { PushControls } from "@/components/push-controls";
 import { cn } from "@/lib/utils";
 
 interface SettingsData {
+  notifyWeighIn: boolean;
+  notifyMeals: boolean;
+  weeklyReport: boolean;
   tdeeWindowDays: number;
 }
 interface Device { provider: string; status: string; lastSyncAt: string | null }
@@ -33,6 +36,19 @@ const consentLabel: Record<string, string> = {
   health_data: "Sağlık Verisi İşleme Rızası",
   gdpr: "GDPR",
 };
+
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className={cn("relative h-6 w-11 rounded-full transition-colors", on ? "bg-primary" : "bg-surface-3")}
+    >
+      <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", on ? "left-[22px]" : "left-0.5")} />
+    </button>
+  );
+}
 
 export function SettingsForm({
   initial,
@@ -93,7 +109,16 @@ export function SettingsForm({
 
       {/* Notifications */}
       <Section title="Bildirimler">
-        <div>
+        <Rowt label="Tartılma hatırlatıcısı" desc="Her sabah trend ölçümü için">
+          <Toggle on={form.notifyWeighIn} onChange={(v) => set("notifyWeighIn", v)} />
+        </Rowt>
+        <Rowt label="Öğün kaydı hatırlatıcısı" desc="Öğün eklemeyi unutma">
+          <Toggle on={form.notifyMeals} onChange={(v) => set("notifyMeals", v)} />
+        </Rowt>
+        <Rowt label="Haftalık rapor" desc="TDEE ve ilerleme özeti">
+          <Toggle on={form.weeklyReport} onChange={(v) => set("weeklyReport", v)} />
+        </Rowt>
+        <div className="border-t border-border pt-3">
           <div className="mb-2 text-sm font-medium">Push bildirimleri</div>
           <PushControls />
         </div>
