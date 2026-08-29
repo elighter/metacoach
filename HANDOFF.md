@@ -3,7 +3,7 @@
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
 > **Backlog:** öncelikli olmayan fikirler `BACKLOG.md`'de (zengin sağlık widget'ları, motto, koç şablonları vb.).
 > **Koç program builder** artık takvim/hafta görünümü (gün-şeridi + seçili gün editörü).
-> Tarih: 2026-08-29 · Durum: **Faz 0–4B tamamlandı, master'da (PR #1–#26 merge), CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby). Son sprint: koç modülü, Mi Scale 2 BLE, dashboard gerçek kalori, antrenman dedup, zamana göre selamlama, antrenman senkron teşhisi, koç-bilinçli antrenman, Resend ile koç e-postası, **günlük bildirim cron'u (toggle-farkında)**. Domain altyapısı (`metacoachhealth.com`) devam ediyor.
+> Tarih: 2026-08-29 · Durum: **Faz 0–4B tamamlandı, master'da (PR #1–#26 merge), CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby). Son sprint: koç modülü, Mi Scale 2 BLE, dashboard gerçek kalori, antrenman dedup, zamana göre selamlama, antrenman senkron teşhisi, koç-bilinçli antrenman, Resend ile koç e-postası, **günlük bildirim cron'u (toggle-farkında)**. Domain altyapısı (`metacoachhealth.com`) tamamlandı — Resend verified, koç e-postası prod'da doğrulandı.
 > ⚠️ **HAE 2. otomasyon (Workouts) kuruldu** — antrenman senkronu aktif.
 
 ---
@@ -205,7 +205,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Fix: callbackUrl koç davet linki** ✅ (2026-08-26, PR #13): Middleware redirect'i callbackUrl'i mutlak URL olarak veriyordu; `safeCallback` yalnızca `"/"`ile başlayanı kabul edip tam URL'i `"/"`'a düşürüyordu → koç giriş sonrası `/coach/accept`'e gitmiyordu. Aynı-origin mutlak URL artık path+search olarak kabul ediliyor.
 - **Antrenman modülü** ✅ (2026-08-25, tarayıcıda doğrulandı): 4 fazlı periyodizasyon (hazırlık→ana yüklenme→kardiyo→soğuma), 3 gün A/B split (A=kuvvet, B=fonksiyonel). Claude ile kişiye özel program üretimi (strict tool call) + deterministik şablon fallback. 34 egzersizlik salon kütüphanesi. `/workout` sayfası (4 faz akordeonu, set işaretle/ağırlık logla, seansı tamamla), dashboard `nextWorkout` widget'ı, "Antrenman" nav. Adaptif antrenman-günü protein artışı. **Kritik karar:** tahmini yakılan kalori sadece gösterim — Dynamic TDEE'ye BESLENMEZ (çift sayım önlenir; TDEE zaten toplam harcamayı kilo/alım'dan öğreniyor). estKcal doğrulandı (519 kcal / 59 dk).
 
-**Build:** 30+ route + middleware (workout + assessment + coach preview + biometric delete + manual ingest dahil), tip hatası yok, `npm run build` temiz. **Prod:** `metacoach-three.vercel.app`
+**Build:** 30+ route + middleware (workout + assessment + coach preview + biometric delete + manual ingest dahil), tip hatası yok, `npm run build` temiz. **Prod:** `https://metacoachhealth.com`
 
 ---
 
@@ -218,9 +218,9 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - `CLAUDE_PARSE_MODEL="claude-sonnet-5"` (varsayılan, override edilebilir)
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (prod anahtarları Vercel'de)
 - `TDEE_WINDOW_DAYS="21"` · `NEXT_PUBLIC_APP_NAME="MetaCoach"`
-- `APP_BASE_URL` (prod: `https://metacoach-three.vercel.app`)
+- `APP_BASE_URL` (prod: `https://metacoachhealth.com`)
 - `RESEND_API_KEY` — Resend e-posta servisi (koç hatırlatma, free tier 100/gün)
-- `EMAIL_FROM` — gönderici adresi (varsayılan: `MetaCoach <onboarding@resend.dev>`, custom domain ile değiştirilebilir)
+- `EMAIL_FROM` — gönderici adresi (prod: `MetaCoach <noreply@metacoachhealth.com>`, Resend verified domain)
 - `CRON_SECRET` — Vercel Cron endpoint güvenliği (`openssl rand -base64 33`)
 - Opsiyonel (prod): `R2_*`/`S3_*` (object storage), `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`
 
@@ -248,7 +248,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 | **Neon** | **Free ($0)** | 0.5GB + 100 CU-hr/ay. Tek kullanıcı sağlık verisi için fazlasıyla yeter. Cold start ~1sn (kişisel kullanımda sorun değil). |
 | **Vercel** | **Hobby (free)** | Kişisel proje. Next.js sıfır-config deploy. Ticari olursa Pro ($20/ay). |
 | **Anthropic API** | Kullandıkça öde | Sonnet 5, parse başına birkaç sent. |
-| **Domain** | **Vercel subdomain** (`.vercel.app`) başlangıçta | HTTPS dahil, $0. Custom domain isterse Cloudflare/Namecheap ~$10/yıl. |
+| **Domain** | **`metacoachhealth.com`** (Cloudflare Registrar) | HTTPS dahil, ~$10/yıl. Resend verified (EU), Vercel CNAME. |
 | **R2 / Sentry** | Sonra | Bloklayıcı değil. R2 olmadan parse çalışır (orijinal dosya saklanmaz). |
 
 **Toplam altyapı maliyeti: $0/ay** + Claude API parse başına ~birkaç sent.
@@ -256,10 +256,11 @@ public/ manifest.webmanifest sw.js offline.html icons/
 ### Deploy durumu (tamamlandı 2026-08-15)
 
 - **Neon:** `ep-ancient-frog-b2q1sk3n.c-6.eu-central-1.aws.neon.tech/neondb` (Frankfurt, Free)
-- **Vercel:** `metacoach-three.vercel.app` (Hobby, auto-deploy on push to master)
+- **Vercel:** `metacoachhealth.com` (Hobby, auto-deploy on push to master, custom domain via Cloudflare CNAME)
 - **Deployment Protection:** kapalı (prod public, auth kendi login ekranımızda)
 - **CI/CD:** `git push origin master` → Vercel otomatik build (`db:provider` → `prisma migrate deploy` → `next build`)
-- **Env vars:** 12 adet Vercel'de (DATABASE_URL, AUTH_SECRET, AUTH_TRUST_HOST, PARSE_PROVIDER=claude, ANTHROPIC_API_KEY, CLAUDE_PARSE_MODEL, NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, TDEE_WINDOW_DAYS, NEXT_PUBLIC_APP_NAME, APP_BASE_URL)
+- **Env vars:** 14+ adet Vercel'de (DATABASE_URL, AUTH_SECRET, AUTH_TRUST_HOST, PARSE_PROVIDER=claude, ANTHROPIC_API_KEY, CLAUDE_PARSE_MODEL, NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, TDEE_WINDOW_DAYS, NEXT_PUBLIC_APP_NAME, APP_BASE_URL, RESEND_API_KEY, CRON_SECRET, EMAIL_FROM)
+- **⚠️ Env cleanup gerekli:** `EMAIL_FROM` (3 adet), `CRON_SECRET` (3 adet) duplike girişler var — Vercel dashboard'dan tekile indirilmeli
 
 ### Doğrulanmış (prod'da)
 - `/api/health` → 200, DB up, latency 3ms ✅
@@ -270,33 +271,41 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - Güvenlik başlıkları (CSP, HSTS, X-Frame-Options) ✅
 - Next.js 15.5.23 (CVE-2025-66478 fix) ✅
 
-### ✅ Domain & e-posta altyapısı (2026-08-29)
+### ✅ Domain & e-posta altyapısı (2026-08-29, tamamlandı)
 - **Domain:** `metacoachhealth.com` — Cloudflare Registrar (Active) + Resend domain verified (EU/Ireland)
 - **DNS:** SPF + DKIM + MX otomatik yapılandırıldı (Resend ↔ Cloudflare auto-configure)
-- **E-posta:** `noreply@metacoachhealth.com` — artık herhangi bir adrese gönderebilir (sandbox sınırlaması aşıldı)
-- **Kod:** `email.ts` Resend-only, fallback from adresi `noreply@metacoachhealth.com`, appUrl default'ları güncellendi
-- **Kalan:**
-  1. ~~Resend domain doğrulama~~ ✅
-  2. Vercel'e custom domain ekle → Cloudflare'da CNAME yapılandır
-  3. Vercel env: `EMAIL_FROM=MetaCoach <noreply@metacoachhealth.com>`, `APP_BASE_URL=https://metacoachhealth.com`
-  4. Vercel'den SMTP_* env var'larını sil
-  5. Deploy + coach-reminder cron'u tetikle
+- **Vercel:** `metacoachhealth.com` custom domain ekli, Cloudflare CNAME (proxy OFF) ile yönlendirme yapıldı
+- **E-posta:** `noreply@metacoachhealth.com` — sandbox sınırlaması aşıldı, herhangi bir adrese gönderebilir
+- **Koç e-postası doğrulandı:** `zehraogul95@gmail.com`'a Resend üzerinden başarıyla teslim edildi (Sent → Delivered, 29 Ağu)
+- **Kod:** `email.ts` Resend-only, `email.ts` / `test-email/route.ts` / `coach-reminder/route.ts` appUrl default'ları `metacoachhealth.com` olarak güncellendi
+- **Login:** demo giriş bilgileri (e-posta/şifre) üretim giriş ekranından kaldırıldı (sadece `npm run db:seed` ile yerel dev)
+- **Kalan (Vercel dashboard'dan yapılacak):**
+  1. `EMAIL_FROM` → `MetaCoach <noreply@metacoachhealth.com>` olarak güncelle (mevcut duplike girişleri temizle — 3 adet var)
+  2. `APP_BASE_URL` → `https://metacoachhealth.com` olarak güncelle
+  3. `CRON_SECRET` duplike girişleri temizle (3 adet var)
+  4. SMTP_* env var'ları varsa sil
 
-### ⏳ Prod doğrulaması bekleyen (2026-08-28)
+### ⏳ Prod doğrulaması bekleyen (2026-08-29)
 - **Mi Scale 2 BLE (notification tabanlı okuma + kilo doğruluğu)** — PR #21-#22, canlıda gerçek tartı ile test bekleniyor.
 - **Dashboard gerçek yakılan kalori** — PR #19, `DailyLog.basalKcal` migration'ı prod'a uygulanmış olmalı; canlıda grafik kontrolü bekleniyor.
 - **Manuel sağlık verisi yükleme** — PR #22, Ayarlar'dan JSON sürükle-bırak ile ingest; prod testi bekleniyor.
 - **Antrenman geçmişi takvim şeridi** — gün bazlı gruplama, kaynak rozeti, 10+ sayfalama.
-- **Koç e-postasında program kontrolü** — `source:"coach"` filtresi, template/AI programlar yanlış "program var" göstermez.
 - **Dashboard dün desteği** — gece yarısından sonra bugün verisi yoksa dünün beslenme/aktivitesini "Dün" etiketiyle gösterir.
 - **Günlük bildirim cron'u** — `notifyWeighIn`/`notifyMeals` toggle'ları artık çalışıyor. `/api/cron/daily-reminders` sabah 06:00 UTC (tartılma) ve 17:00 UTC (öğün) push bildirimi gönderiyor, toggle kapalıysa göndermiyor. `vercel.json` crons güncellenmiş.
+
+### ✅ Prod'da doğrulanmış (2026-08-29)
+- **Koç e-postası** — `noreply@metacoachhealth.com` → `zehraogul95@gmail.com`, Sent→Delivered ✅
+- **Koç e-postasında program kontrolü** — `source:"coach"` filtresi, template/AI programlar yanlış "program var" göstermez ✅
+- **Custom domain** — `https://metacoachhealth.com` site yükleniyor ✅
+- **Demo giriş bilgileri** — üretim login sayfasından kaldırıldı ✅
 
 ---
 
 ## 11. Sıradaki
 
 - **Neon MCP Server entegrasyonu** — `.claude/settings.json`'a `https://mcp.neon.tech/mcp?category=querying&category=schema&readonly=true` ekle → Claude Code oturumları DB'yi doğrudan sorgulayabilir (koç giriş yapmış mı, antrenman senkron durumu vb.). OAuth ile auth, API key gerektirmez. CCR ortamında ağ politikası `neon.tech` erişimine izin vermeli. Geçici çözüm: `GET /api/admin/debug` endpoint'i (oturum korumalı).
-- **Custom domain** `metacoachhealth.com` (Cloudflare, Active) — Resend doğrulama + Vercel CNAME
+- **Vercel env cleanup** — duplike `EMAIL_FROM` (3), `CRON_SECRET` (3) girişlerini tekile indir; `APP_BASE_URL`'i `https://metacoachhealth.com` yap
+- **Cloudflare güvenlik** — DNSSEC aç (tek tıklama, registrar+DNS ikisi de Cloudflare), 2FA aktif et (önce "Forgot password" ile şifre oluştur)
 - **R2 object storage** — orijinal dosyaların saklanması (Cloudflare R2 free tier 10GB)
 - **Sentry** — error monitoring (free tier)
 - **Yiyecek veritabanı** — prod'da FoodItem tablosu boş, seed veya toplu import gerekli (manuel arama için)
