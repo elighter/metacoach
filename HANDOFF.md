@@ -3,7 +3,7 @@
 > Bu dosyayı yeni sohbete yapıştır ya da "MetaCoach HANDOFF.md'yi oku ve kaldığımız yerden devam et" de.
 > **Backlog:** öncelikli olmayan fikirler `BACKLOG.md`'de (zengin sağlık widget'ları, motto, koç şablonları vb.).
 > **Koç program builder** artık takvim/hafta görünümü (gün-şeridi + seçili gün editörü).
-> Tarih: 2026-08-28 · Durum: **Faz 0–4B tamamlandı, master'da (PR #1–#26 merge), CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby). Son sprint (PR #13–#26): koç modülü iyileştirmeleri, Mi Scale 2 BLE düzeltmeleri, dashboard gerçek kalori, antrenman dedup güçlendirme, zamana göre selamlama, antrenman senkron teşhisi, koç-bilinçli antrenman, Resend ile koç haftalık hatırlatma e-postası, **coachPlan widget + /plan nav kaldırıldı (antrenman takibi /workout altında)**.
+> Tarih: 2026-08-29 · Durum: **Faz 0–4B tamamlandı, master'da (PR #1–#26 merge), CI yeşil, CANLI.** Neon (Frankfurt) + Vercel (Hobby). Son sprint: koç modülü, Mi Scale 2 BLE, dashboard gerçek kalori, antrenman dedup, zamana göre selamlama, antrenman senkron teşhisi, koç-bilinçli antrenman, Resend ile koç e-postası, **günlük bildirim cron'u (toggle-farkında)**. Domain altyapısı (`metacoach.fyi`) devam ediyor.
 > ⚠️ **HAE 2. otomasyon (Workouts) kuruldu** — antrenman senkronu aktif.
 
 ---
@@ -267,6 +267,19 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - Güvenlik başlıkları (CSP, HSTS, X-Frame-Options) ✅
 - Next.js 15.5.23 (CVE-2025-66478 fix) ✅
 
+### ⏳ Domain & e-posta altyapısı (2026-08-29, devam ediyor)
+- **Domain:** `metacoach.fyi` Cloudflare Registrar'dan satın alınıyor ($5.20/yıl)
+- **Sorun:** Resend sandbox (`onboarding@resend.dev`) yalnızca hesap sahibi (emrecakmak@me.com) adresine gönderebiliyor → koç e-postası (zehraogul95@gmail.com) 403 alıyor. Vercel'de SMTP (port 587/465) engellendiği için Nodemailer çalışmıyor — **SMTP kodu kaldırıldı**.
+- **Çözüm:** Cloudflare'da domain → Resend'e ekle → DNS (SPF/DKIM/DMARC) doğrula → `noreply@metacoach.fyi` olarak herhangi bir adrese e-posta gönder
+- **Kalan adımlar:**
+  1. Resend → Domains → `metacoach.fyi` ekle → DNS kayıtlarını al
+  2. Cloudflare DNS'e SPF, DKIM (3 kayıt), DMARC ekle
+  3. Vercel'e custom domain ekle → Cloudflare'da CNAME yapılandır
+  4. Vercel env: `EMAIL_FROM=MetaCoach <noreply@metacoach.fyi>`, `APP_BASE_URL=https://metacoach.fyi`
+  5. Vercel'den SMTP_* env var'larını sil (artık gereksiz)
+  6. Coach-reminder cron'u tetikle → koça düzeltilmiş e-posta gönder
+- **Kod hazır:** `email.ts` Resend-only (nodemailer/SMTP kaldırıldı), `.env.example` SMTP satırları kaldırıldı
+
 ### ⏳ Prod doğrulaması bekleyen (2026-08-28)
 - **Mi Scale 2 BLE (notification tabanlı okuma + kilo doğruluğu)** — PR #21-#22, canlıda gerçek tartı ile test bekleniyor.
 - **Dashboard gerçek yakılan kalori** — PR #19, `DailyLog.basalKcal` migration'ı prod'a uygulanmış olmalı; canlıda grafik kontrolü bekleniyor.
@@ -281,7 +294,7 @@ public/ manifest.webmanifest sw.js offline.html icons/
 ## 11. Sıradaki
 
 - **Neon MCP Server entegrasyonu** — `.claude/settings.json`'a `https://mcp.neon.tech/mcp?category=querying&category=schema&readonly=true` ekle → Claude Code oturumları DB'yi doğrudan sorgulayabilir (koç giriş yapmış mı, antrenman senkron durumu vb.). OAuth ile auth, API key gerektirmez. CCR ortamında ağ politikası `neon.tech` erişimine izin vermeli. Geçici çözüm: `GET /api/admin/debug` endpoint'i (oturum korumalı).
-- **Custom domain** opsiyonel — Cloudflare/Namecheap ~$10/yıl
+- **Custom domain** `metacoach.fyi` (Cloudflare, satın alınıyor) — Resend doğrulama + Vercel CNAME
 - **R2 object storage** — orijinal dosyaların saklanması (Cloudflare R2 free tier 10GB)
 - **Sentry** — error monitoring (free tier)
 - **Yiyecek veritabanı** — prod'da FoodItem tablosu boş, seed veya toplu import gerekli (manuel arama için)
