@@ -106,6 +106,7 @@ src/
       push/subscribe/ push/test/   # web push
       health/                 # DB ping, auth'suz
       cron/coach-reminder/    # haftalık koç hatırlatma (Vercel Cron, CRON_SECRET)
+      cron/daily-reminders/   # günlük push bildirim (tartılma/öğün — toggle-farkında)
   components/
     app-shell.tsx             # sidebar + topbar + tema + çıkış + kullanıcı
     theme-provider.tsx        # system/light/dark, .dark class, no-flash
@@ -273,6 +274,10 @@ public/ manifest.webmanifest sw.js offline.html icons/
 - **Mi Scale 2 BLE (notification tabanlı okuma + kilo doğruluğu)** — PR #21-#22, canlıda gerçek tartı ile test bekleniyor.
 - **Dashboard gerçek yakılan kalori** — PR #19, `DailyLog.basalKcal` migration'ı prod'a uygulanmış olmalı; canlıda grafik kontrolü bekleniyor.
 - **Manuel sağlık verisi yükleme** — PR #22, Ayarlar'dan JSON sürükle-bırak ile ingest; prod testi bekleniyor.
+- **Antrenman geçmişi takvim şeridi** — gün bazlı gruplama, kaynak rozeti, 10+ sayfalama.
+- **Koç e-postasında program kontrolü** — `source:"coach"` filtresi, template/AI programlar yanlış "program var" göstermez.
+- **Dashboard dün desteği** — gece yarısından sonra bugün verisi yoksa dünün beslenme/aktivitesini "Dün" etiketiyle gösterir.
+- **Günlük bildirim cron'u** — `notifyWeighIn`/`notifyMeals` toggle'ları artık çalışıyor. `/api/cron/daily-reminders` sabah 06:00 UTC (tartılma) ve 17:00 UTC (öğün) push bildirimi gönderiyor, toggle kapalıysa göndermiyor. `vercel.json` crons güncellenmiş.
 
 ---
 
