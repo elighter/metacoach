@@ -60,7 +60,7 @@ export async function GET() {
 
   const result = await sendEmail({
     to: user.email,
-    subject: `[TEST] Haftalık Danışan Özeti — ${summaries.length} danışan`,
+    subject: `Haftalık Danışan Özeti — ${summaries.length} danışan`,
     html,
   });
 
