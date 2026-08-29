@@ -89,11 +89,6 @@ export default function LoginPage() {
           </p>
         </form>
 
-        {!isCoachFlow && (
-          <p className="mt-4 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-center text-xs text-ink-3">
-            Demo giriş: <span className="font-mono">emrecakmak@me.com</span> / <span className="font-mono">metacoach123</span>
-          </p>
-        )}
       </div>
     </div>
   );

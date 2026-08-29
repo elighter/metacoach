@@ -65,7 +65,7 @@ npm run setup        # SQLite şema + 28 günlük seed
 npm run dev          # http://localhost:3000
 ```
 
-**Demo giriş:** `emrecakmak@me.com` / `metacoach123`
+**Demo giriş (yerel dev):** `emrecakmak@me.com` / `metacoach123` (sadece `npm run db:seed` ile, prod'da gösterilmez)
 Diğer komutlar: `npm run build`, `npm run db:seed`, `npm run db:reset`, `npm run typecheck`.
 
 **Not:** Auth/middleware değişikliklerinden sonra dev sunucusunu **yeniden başlat** (port 3000'i öldür + `npm run dev`).
