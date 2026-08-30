@@ -7,10 +7,14 @@ import type { NextAuthConfig } from "next-auth";
 const PUBLIC_PREFIXES = [
   "/login",
   "/register",
+  "/forgot-password",
+  "/reset-password",
   "/api/register",
   "/api/health",
   "/api/ingest/health",
   "/api/cron/",
+  "/api/forgot-password",
+  "/api/reset-password",
 ];
 
 export const authConfig = {

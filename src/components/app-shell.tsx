@@ -154,7 +154,7 @@ export function AppShell({
   const onboarding = useOnboarding();
 
   // Auth screens render without the app chrome.
-  if (pathname.startsWith("/login") || pathname.startsWith("/register")) {
+  if (pathname.startsWith("/login") || pathname.startsWith("/register") || pathname.startsWith("/forgot-password") || pathname.startsWith("/reset-password")) {
     return <div className="min-h-screen">{children}</div>;
   }
 

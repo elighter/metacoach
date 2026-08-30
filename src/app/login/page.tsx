@@ -80,6 +80,9 @@ export default function LoginPage() {
             <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••" />
           </label>
           {error && <div className="rounded-lg bg-crit-wash px-3 py-2 text-sm text-crit">{error}</div>}
+          <div className="text-right">
+            <Link href="/forgot-password" className="text-sm text-primary-ink hover:underline">Şifremi unuttum</Link>
+          </div>
           <button type="submit" className="btn btn-primary" disabled={busy}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />} Giriş yap
           </button>
