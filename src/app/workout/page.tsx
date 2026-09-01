@@ -43,7 +43,6 @@ export default async function WorkoutPage() {
   const current =
     sessions.find((s) => s.status !== "completed" && new Date(s.scheduledFor) >= today) ??
     sessions.find((s) => s.status !== "completed") ??
-    sessions[0] ??
     null;
 
   let currentView: SessionView | null = null;
@@ -87,7 +86,7 @@ export default async function WorkoutPage() {
   }
 
   const upcoming = sessions
-    .filter((s) => s.id !== current?.id)
+    .filter((s) => s.id !== current?.id && s.status !== "completed")
     .slice(0, 4)
     .map((s) => ({
       id: s.id,
