@@ -29,6 +29,18 @@ const EXERCISES = [
   { slug: "lunge-lateral-raise", name: "Lunge + Lateral Raise", phase: "functional", muscleGroup: "full", equipment: "dumbbell", met: 6, unit: "reps" },
   { slug: "step-up-knee-ohp", name: "Step-Up + Knee Drive + Overhead Press", phase: "functional", muscleGroup: "full", equipment: "dumbbell", met: 6.5, unit: "reps" },
   { slug: "jump-squat", name: "Jump Squat", phase: "functional", muscleGroup: "legs", equipment: "bodyweight", met: 7.5, unit: "reps" },
+  // Original library exercises missing from prod DB
+  { slug: "kb-swing", name: "Kettlebell Swing", phase: "functional", muscleGroup: "full", equipment: "kettlebell", met: 7, unit: "reps" },
+  { slug: "lat-pulldown", name: "Lat Pulldown", phase: "strength", muscleGroup: "pull", equipment: "cable", met: 5, unit: "reps" },
+  { slug: "bench-press", name: "Bench Press", phase: "strength", muscleGroup: "push", equipment: "barbell", met: 6, unit: "reps" },
+  { slug: "leg-press", name: "Leg Press", phase: "strength", muscleGroup: "legs", equipment: "machine", met: 5.5, unit: "reps" },
+  { slug: "overhead-press", name: "Overhead Press", phase: "strength", muscleGroup: "push", equipment: "barbell", met: 6, unit: "reps" },
+  { slug: "back-squat", name: "Barbell Squat", phase: "strength", muscleGroup: "legs", equipment: "barbell", met: 6, unit: "reps" },
+  { slug: "barbell-row", name: "Barbell Row", phase: "strength", muscleGroup: "pull", equipment: "barbell", met: 6, unit: "reps" },
+  { slug: "romanian-deadlift", name: "Romanian Deadlift", phase: "strength", muscleGroup: "legs", equipment: "barbell", met: 6, unit: "reps" },
+  { slug: "seated-cable-row", name: "Seated Cable Row", phase: "strength", muscleGroup: "pull", equipment: "cable", met: 5, unit: "reps" },
+  { slug: "incline-db-press", name: "Incline Dumbbell Press", phase: "strength", muscleGroup: "push", equipment: "dumbbell", met: 5.5, unit: "reps" },
+  { slug: "walking-lunge", name: "Dumbbell Walking Lunge", phase: "strength", muscleGroup: "legs", equipment: "dumbbell", met: 5.5, unit: "reps" },
 ];
 
 const SESSIONS = [
@@ -104,7 +116,7 @@ export async function POST(req: Request) {
     create: { coachId: coach.id, clientId: client.id, status: "active", permissions: JSON.stringify(["workout", "nutrition", "biometric", "activity"]) },
   });
 
-  // Exercises
+  // Exercises — upsert all (including originals missing from prod)
   for (const ex of EXERCISES) {
     await prisma.exercise.upsert({ where: { slug: ex.slug }, update: {}, create: ex });
   }
@@ -112,59 +124,51 @@ export async function POST(req: Request) {
   const allEx = await prisma.exercise.findMany({ select: { id: true, slug: true } });
   const slugMap = Object.fromEntries(allEx.map((e) => [e.slug, e.id]));
 
-  // Deactivate old programs
-  await prisma.workoutProgram.updateMany({
-    where: { userId: client.id, active: true },
-    data: { active: false },
-  });
+  const results: string[] = [`CoachLink: ${link.id}`];
 
-  // Create program
-  const program = await prisma.workoutProgram.create({
-    data: {
-      userId: client.id,
-      name: "Koç Programı — Ağustos Sonu",
-      goal: "maintain",
-      daysPerWeek: 3,
-      splitType: "ab",
-      source: "coach",
-      active: true,
-      notes: "25.08 Denge/Mobilizasyon, 30.08 Fonksiyonel Kardiyo, 31.08 Kuvvet Üst Vücut",
-    },
+  // Find existing sessions and patch missing sets
+  const existingSessions = await prisma.workoutSession.findMany({
+    where: { userId: client.id, programId: { not: null } },
+    include: { sets: true, program: true },
+    orderBy: { scheduledFor: "asc" },
   });
-
-  const results: string[] = [`CoachLink: ${link.id}`, `Program: ${program.id}`];
 
   for (const s of SESSIONS) {
-    const session = await prisma.workoutSession.create({
-      data: {
-        userId: client.id,
-        programId: program.id,
-        scheduledFor: new Date(s.date + "T09:00:00"),
-        dayType: s.dayType,
-        label: s.label,
-        status: "planned",
-        source: "planned",
-      },
-    });
+    const targetDate = new Date(s.date + "T09:00:00");
+    const existing = existingSessions.find(
+      (es) => es.label === s.label && es.scheduledFor.toISOString().startsWith(s.date)
+    );
 
-    let count = 0;
-    for (let i = 0; i < s.exercises.length; i++) {
-      const ex = s.exercises[i];
-      const exerciseId = slugMap[ex.slug];
-      if (!exerciseId) { results.push(`MISSING: ${ex.slug}`); continue; }
-      await prisma.workoutSet.create({
-        data: {
-          sessionId: session.id,
-          exerciseId,
-          phase: s.dayType === "strength" ? "strength" : "activation",
-          orderIdx: i,
-          targetSets: ex.sets,
-          targetReps: ex.reps,
-        },
-      });
-      count++;
+    if (existing) {
+      const existingSlugs = new Set(
+        existing.sets.map((set) => {
+          const ex = allEx.find((e) => e.id === set.exerciseId);
+          return ex?.slug;
+        })
+      );
+
+      let added = 0;
+      for (let i = 0; i < s.exercises.length; i++) {
+        const ex = s.exercises[i];
+        if (existingSlugs.has(ex.slug)) continue;
+        const exerciseId = slugMap[ex.slug];
+        if (!exerciseId) { results.push(`STILL MISSING: ${ex.slug}`); continue; }
+        await prisma.workoutSet.create({
+          data: {
+            sessionId: existing.id,
+            exerciseId,
+            phase: s.dayType === "strength" ? "strength" : "activation",
+            orderIdx: existing.sets.length + added,
+            targetSets: ex.sets,
+            targetReps: ex.reps,
+          },
+        });
+        added++;
+      }
+      results.push(`Patched "${s.label}" (${s.date}): +${added} sets`);
+    } else {
+      results.push(`Session "${s.label}" not found — skipped`);
     }
-    results.push(`Session "${s.label}" (${s.date}): ${count} exercises`);
   }
 
   return NextResponse.json({ ok: true, results });
