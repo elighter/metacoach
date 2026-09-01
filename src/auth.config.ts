@@ -15,6 +15,7 @@ const PUBLIC_PREFIXES = [
   "/api/cron/",
   "/api/forgot-password",
   "/api/reset-password",
+  "/api/admin/seed-coach-program",
 ];
 
 export const authConfig = {
