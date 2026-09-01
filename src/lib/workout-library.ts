@@ -51,6 +51,15 @@ export const EXERCISE_LIBRARY: ExerciseSeed[] = [
   { slug: "incline-walk", name: "Eğimli yürüyüş (ısınma)", phase: "activation", muscleGroup: "cardio", equipment: "cardio_machine", met: 4.3, unit: "seconds", instructionTr: "%6-8 eğim, düşük tempo — nabzı kademeli yükselt." },
   { slug: "elliptical-warmup", name: "Eliptik ısınma", phase: "activation", muscleGroup: "cardio", equipment: "cardio_machine", met: 4.5, unit: "seconds", instructionTr: "Düşük dirençte akıcı tempo, eklemleri ısıt." },
   { slug: "leg-swings", name: "Bacak salınımı (dinamik)", phase: "activation", muscleGroup: "mobility", equipment: "bodyweight", met: 3.2, unit: "reps", instructionTr: "Öne-arkaya ve yana kontrollü salınım." },
+  { slug: "roll-up-ball", name: "Roll Up with Ball", phase: "activation", muscleGroup: "core", equipment: "bodyweight", met: 3.5, unit: "reps", instructionTr: "Top ile spinal mobilizasyon + core kontrolü." },
+  { slug: "banded-single-leg-circle", name: "Banded Single Leg Circle", phase: "activation", muscleGroup: "mobility", equipment: "band", met: 3.5, unit: "reps", instructionTr: "Bant direnciyle kalça mobilizasyonu + pelvik kontrol." },
+  { slug: "dead-bug-ball", name: "Dead Bug with Ball + Alternating Leg Extension", phase: "activation", muscleGroup: "core", equipment: "bodyweight", met: 3.5, unit: "reps", instructionTr: "Sırt yere yapışık, karşı kol-bacak uzat, core stabil." },
+  { slug: "seated-single-leg-lift", name: "Seated Alternating Single Leg Lift", phase: "activation", muscleGroup: "core", equipment: "bodyweight", met: 3, unit: "reps", instructionTr: "Oturarak tek bacak kaldırma — kalça fleksör + pelvis stabilitesi." },
+  { slug: "quadruped-knee-ext", name: "Quadruped Resisted Knee Extension", phase: "activation", muscleGroup: "core", equipment: "band", met: 3.5, unit: "reps", instructionTr: "Dört ayak pozisyonda dirençli diz ekstansiyonu." },
+  { slug: "quadruped-hip-ext", name: "Quadruped Resisted Hip Extension", phase: "activation", muscleGroup: "core", equipment: "band", met: 3.5, unit: "reps", instructionTr: "Dört ayak pozisyonda dirençli kalça ekstansiyonu — glute + pelvik stabil." },
+  { slug: "marching-bridge", name: "Marching Bridge", phase: "activation", muscleGroup: "core", equipment: "bodyweight", met: 4, unit: "reps", instructionTr: "Köprü pozisyonunda yürüme — glute + pelvik stabilizasyon." },
+  { slug: "bird-dog", name: "Bird Dog", phase: "activation", muscleGroup: "core", equipment: "bodyweight", met: 3.5, unit: "reps", instructionTr: "Karşı kol-bacak uzatma — koordinasyon + denge + core." },
+  { slug: "overhead-ball-knee-drive", name: "Overhead Ball Knee Drive", phase: "activation", muscleGroup: "core", equipment: "bodyweight", met: 4, unit: "reps", instructionTr: "Top baş üstünde, diz çekme — dinamik denge + koordinasyon + core." },
 
   // ── Strength (A day, full body) ──
   { slug: "back-squat", name: "Barbell Squat", phase: "strength", muscleGroup: "legs", equipment: "barbell", met: 6, unit: "reps", instructionTr: "Kalça-diz aynı anda, sırt nötr, paralelin altına in." },
@@ -63,6 +72,13 @@ export const EXERCISE_LIBRARY: ExerciseSeed[] = [
   { slug: "seated-cable-row", name: "Seated Cable Row", phase: "strength", muscleGroup: "pull", equipment: "cable", met: 5, unit: "reps", instructionTr: "Gövde sabit, kürek kemiklerini sıkıştır." },
   { slug: "incline-db-press", name: "Incline Dumbbell Press", phase: "strength", muscleGroup: "push", equipment: "dumbbell", met: 5.5, unit: "reps", instructionTr: "30° eğim, dumbbell'ları kontrollü indir-çıkar." },
   { slug: "walking-lunge", name: "Dumbbell Walking Lunge", phase: "strength", muscleGroup: "legs", equipment: "dumbbell", met: 5.5, unit: "reps", instructionTr: "Uzun adım, arka diz yere yakın, gövde dik." },
+  { slug: "upper-back-row", name: "Upper Back Row", phase: "strength", muscleGroup: "pull", equipment: "machine", met: 5, unit: "reps", instructionTr: "Üst sırt + trapez — skapular kontrol." },
+  { slug: "back-extension", name: "Back Extension", phase: "strength", muscleGroup: "pull", equipment: "bodyweight", met: 4.5, unit: "reps", instructionTr: "Bel + glute + hamstring — posterior chain." },
+  { slug: "rear-delt-fly", name: "Rear Delt Fly", phase: "strength", muscleGroup: "pull", equipment: "dumbbell", met: 4, unit: "reps", instructionTr: "Arka omuz + üst sırt — omuz stabilizasyonu." },
+  { slug: "chest-fly", name: "Chest Fly", phase: "strength", muscleGroup: "push", equipment: "dumbbell", met: 4.5, unit: "reps", instructionTr: "Göğüs izolasyonu — kontrollü açma-kapama." },
+  { slug: "lateral-raise", name: "Lateral Raise", phase: "strength", muscleGroup: "push", equipment: "dumbbell", met: 4, unit: "reps", instructionTr: "Orta omuz kuvveti — dumbbell yana kaldırma." },
+  { slug: "preacher-curl", name: "Preacher Curl", phase: "strength", muscleGroup: "pull", equipment: "dumbbell", met: 4, unit: "reps", instructionTr: "Biceps + brachialis — destek sehpada izole curl." },
+  { slug: "triceps-pushdown", name: "Triceps Pushdown", phase: "strength", muscleGroup: "push", equipment: "cable", met: 4, unit: "reps", instructionTr: "Triceps izolasyonu — kablo ile aşağı itme." },
 
   // ── Functional (B day, full body) ──
   { slug: "kb-swing", name: "Kettlebell Swing", phase: "functional", muscleGroup: "full", equipment: "kettlebell", met: 7, unit: "reps", instructionTr: "Patlayıcı kalça itişi, kol sadece salınır, karın kilitli." },
@@ -74,6 +90,15 @@ export const EXERCISE_LIBRARY: ExerciseSeed[] = [
   { slug: "battle-rope", name: "Battle Rope", phase: "functional", muscleGroup: "full", equipment: "cardio_machine", met: 8, unit: "seconds", instructionTr: "Dizler yumuşak, patlayıcı dalgalar, karın kilitli." },
   { slug: "pallof-press", name: "Pallof Press (anti-rotasyon)", phase: "functional", muscleGroup: "core", equipment: "cable", met: 4.5, unit: "reps", instructionTr: "Kabloya dik dur, rotasyona direnç göster, kolları uzat-çek." },
   { slug: "goblet-squat-jump", name: "Goblet Squat + patlama", phase: "functional", muscleGroup: "legs", equipment: "kettlebell", met: 7, unit: "reps", instructionTr: "Goblet pozisyonda in, patlayıcı çık." },
+  { slug: "squat-shoulder-press", name: "Squat + Shoulder Press", phase: "functional", muscleGroup: "full", equipment: "dumbbell", met: 6.5, unit: "reps", instructionTr: "Squat + dikey itiş — tüm vücut bileşik hareket." },
+  { slug: "burpee", name: "Burpee", phase: "functional", muscleGroup: "full", equipment: "bodyweight", met: 8, unit: "reps", instructionTr: "Squat + push + jump — tüm vücut kondisyonu ve çeviklik." },
+  { slug: "dips", name: "Dips", phase: "functional", muscleGroup: "push", equipment: "bodyweight", met: 6, unit: "reps", instructionTr: "Triceps, göğüs ve omuz kuşağı kuvveti." },
+  { slug: "push-up", name: "Push-Up", phase: "functional", muscleGroup: "push", equipment: "bodyweight", met: 5.5, unit: "reps", instructionTr: "Göğüs, triceps, ön omuz ve core stabilizasyonu." },
+  { slug: "pull-up", name: "Pull-Up", phase: "functional", muscleGroup: "pull", equipment: "bodyweight", met: 7, unit: "reps", instructionTr: "Lat, biceps, skapular kontrol ve kavrama kuvveti." },
+  { slug: "sit-up", name: "Sit-Up", phase: "functional", muscleGroup: "core", equipment: "bodyweight", met: 5, unit: "reps", instructionTr: "Gövde fleksiyonu, abdominal kuvvet ve gövde kontrolü." },
+  { slug: "lunge-lateral-raise", name: "Lunge + Lateral Raise", phase: "functional", muscleGroup: "full", equipment: "dumbbell", met: 6, unit: "reps", instructionTr: "Tek taraflı alt ekstremite + omuz — denge ve koordinasyon." },
+  { slug: "step-up-knee-ohp", name: "Step-Up + Knee Drive + Overhead Press", phase: "functional", muscleGroup: "full", equipment: "dumbbell", met: 6.5, unit: "reps", instructionTr: "Unilateral bacak + dikey itiş — denge, koordinasyon, overhead stabil." },
+  { slug: "jump-squat", name: "Jump Squat", phase: "functional", muscleGroup: "legs", equipment: "bodyweight", met: 7.5, unit: "reps", instructionTr: "Alt ekstremite patlayıcı güç — derin squat + sıçrama." },
 
   // ── Cardio ──
   { slug: "treadmill-run", name: "Koşu bandı", phase: "cardio", muscleGroup: "cardio", equipment: "cardio_machine", met: 9, unit: "seconds", instructionTr: "Orta-yüksek tempo, konuşamayacağın eşiğin hemen altında tut." },

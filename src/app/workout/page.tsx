@@ -20,7 +20,7 @@ export default async function WorkoutPage() {
   const [rawProgram, sessions, bio, recent] = await Promise.all([
     prisma.workoutProgram.findFirst({ where: { userId: user.id, active: true } }),
     prisma.workoutSession.findMany({
-      where: { userId: user.id, scheduledFor: { gte: today }, source: hasCoach ? "coach" : undefined },
+      where: { userId: user.id, scheduledFor: { gte: daysAgo(7) }, source: hasCoach ? "coach" : undefined },
       orderBy: { scheduledFor: "asc" },
       include: {
         sets: {
@@ -40,7 +40,11 @@ export default async function WorkoutPage() {
   const program = hasCoach && rawProgram?.source !== "coach" ? null : rawProgram;
 
   // Today's (or next) actionable session = first not-yet-completed upcoming one.
-  const current = sessions.find((s) => s.status !== "completed") ?? sessions[0] ?? null;
+  const current =
+    sessions.find((s) => s.status !== "completed" && new Date(s.scheduledFor) >= today) ??
+    sessions.find((s) => s.status !== "completed") ??
+    sessions[0] ??
+    null;
 
   let currentView: SessionView | null = null;
   let proteinNote: string | null = null;
