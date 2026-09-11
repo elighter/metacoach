@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   if (!q) return NextResponse.json({ foods: [] });
 
   const dbFoods = await prisma.foodItem.findMany({
-    where: { name: { contains: q, mode: "insensitive" } },
+    where: { name: { contains: q } },
     take: 12,
     orderBy: { name: "asc" },
   });
