@@ -6,7 +6,7 @@
 import { LIBRARY_BY_SLUG, type Phase } from "./workout-library";
 
 export type Goal = "cut" | "maintain" | "bulk";
-export type DayType = "strength" | "functional";
+export type DayType = "strength" | "functional" | "activation";
 
 export interface PlannedSet {
   slug: string;
@@ -33,6 +33,7 @@ const ACTIVATION_ROTATIONS: string[][] = [
 const CARDIO_BY_DAY: Record<DayType, string[]> = {
   strength: ["treadmill-run", "rower"],
   functional: ["jump-rope", "stair-climber"],
+  activation: [],
 };
 const COOLDOWN = ["static-hamstring", "static-chest", "foam-roll-cooldown", "box-breathing"];
 
@@ -111,6 +112,7 @@ export function planWeeklyDays(daysPerWeek: number): DayType[] {
 export const DAY_LABEL: Record<DayType, string> = {
   strength: "A · Kuvvet",
   functional: "B · Fonksiyonel",
+  activation: "C · Mobilizasyon",
 };
 
 /**

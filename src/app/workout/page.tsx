@@ -5,6 +5,7 @@ import { trainingDayProtein, type DayType, type Goal } from "@/lib/workout";
 import { WorkoutClient, type SessionView } from "@/components/workout-client";
 import { WorkoutHistory } from "@/components/workout-history";
 import { getClientCoachInfo } from "@/lib/coach";
+import { COACH_TEMPLATES } from "@/lib/coach-programs";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +118,11 @@ export default async function WorkoutPage() {
         upcoming={upcoming}
         proteinNote={proteinNote}
         hasCoach={hasCoach}
+        coachTemplates={hasCoach && program?.source === "coach" ? COACH_TEMPLATES.map((t) => ({
+          key: t.key,
+          label: t.label,
+          exerciseCount: t.exercises.length,
+        })) : undefined}
       />
 
       <WorkoutHistory sessions={recentSessions} />

@@ -37,12 +37,19 @@ export interface SessionView {
   phases: PhaseView[];
 }
 
+interface CoachTemplateView {
+  key: string;
+  label: string;
+  exerciseCount: number;
+}
+
 interface Props {
   program: { name: string; source: string; notes: string | null } | null;
   current: SessionView | null;
   upcoming: { id: string; label: string; status: string; scheduledFor: string }[];
   proteinNote: string | null;
   hasCoach?: boolean;
+  coachTemplates?: CoachTemplateView[];
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -52,7 +59,13 @@ const STATUS_LABEL: Record<string, string> = {
   skipped: "Atlandı",
 };
 
-export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoach }: Props) {
+const TEMPLATE_ICON: Record<string, string> = {
+  mobility: "🧘",
+  functional: "⚡",
+  strength: "🏋️",
+};
+
+export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoach, coachTemplates }: Props) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [sets, setSets] = useState<Record<string, { done: boolean; weightKg: number | null }>>(
@@ -63,6 +76,8 @@ export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoac
   );
   const [completing, setCompleting] = useState(false);
   const [skipping, setSkipping] = useState(false);
+  const [logging, setLogging] = useState<string | null>(null);
+  const [logResult, setLogResult] = useState<{ estKcal: number; durationMin: number } | null>(null);
 
   async function generate() {
     setGenerating(true);
@@ -112,6 +127,25 @@ export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoac
     }
   }
 
+  async function quickLog(templateKey: string) {
+    setLogging(templateKey);
+    setLogResult(null);
+    try {
+      const res = await fetch("/api/workouts/quick-log", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ template: templateKey }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLogResult({ estKcal: data.session.estKcal, durationMin: data.session.durationMin });
+        router.refresh();
+      }
+    } finally {
+      setLogging(null);
+    }
+  }
+
   async function skipSession() {
     if (!current) return;
     setSkipping(true);
@@ -127,9 +161,79 @@ export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoac
     }
   }
 
+  function WorkoutHistoryInline({ sessions: items }: { sessions: typeof upcoming }) {
+    if (!items.length) return null;
+    return (
+      <div className="card p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <CalendarDays className="h-4 w-4 text-ink-3" /> Sıradaki seanslar
+        </div>
+        <div className="mt-3 space-y-1.5">
+          {items.map((u) => (
+            <div key={u.id} className="flex items-center justify-between rounded-lg bg-ink/[0.02] px-3 py-2 text-sm">
+              <span className="font-medium">{u.label}</span>
+              <span className="text-xs text-ink-3">{fmtDate(u.scheduledFor, { weekday: "short", day: "numeric", month: "short" })}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const allSets = current?.phases.flatMap((p) => p.sets) ?? [];
   const doneCount = allSets.filter((s) => sets[s.id]?.done).length;
   const progress = allSets.length ? Math.round((doneCount / allSets.length) * 100) : 0;
+
+  // ── Quick-log: coach program exists, no scheduled session for today ──
+  if (program && !current && coachTemplates?.length) {
+    return (
+      <div className="mt-5 space-y-4">
+        {/* Program header */}
+        <div className="card p-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold">{program.name}</h2>
+            <span className="rounded-full bg-good-wash px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-good">Koç</span>
+          </div>
+          {program.notes && <p className="mt-1 max-w-xl text-sm text-ink-3">{program.notes}</p>}
+        </div>
+
+        {logResult ? (
+          <div className="card p-8 text-center">
+            <CheckCircle2 className="mx-auto h-9 w-9 text-primary-ink" />
+            <p className="mt-2 font-semibold">Antrenman kaydedildi!</p>
+            <p className="mt-1 text-sm text-ink-3">
+              Tahmini ~{logResult.estKcal} kcal · {logResult.durationMin} dk
+            </p>
+          </div>
+        ) : (
+          <div className="card p-4">
+            <h3 className="text-sm font-semibold">Bugün antrenman yaptın mı?</h3>
+            <p className="mt-1 text-xs text-ink-3">Hangi programı uyguladığını seç:</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {coachTemplates.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => quickLog(t.key)}
+                  disabled={!!logging}
+                  className={cn(
+                    "flex flex-col items-center gap-2 rounded-xl border border-border/60 p-4 text-center transition-colors hover:border-primary/40 hover:bg-primary/[0.04]",
+                    logging === t.key && "border-primary/40 bg-primary/[0.04]",
+                  )}
+                >
+                  <span className="text-2xl">{TEMPLATE_ICON[t.key] ?? "💪"}</span>
+                  <span className="text-sm font-medium">{t.label}</span>
+                  <span className="text-xs text-ink-3">{t.exerciseCount} hareket</span>
+                  {logging === t.key && <Loader2 className="h-4 w-4 animate-spin text-primary-ink" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <WorkoutHistoryInline sessions={upcoming} />
+      </div>
+    );
+  }
 
   // ── Empty state: no program yet ──
   if (!program || !current) {
@@ -143,9 +247,6 @@ export function WorkoutClient({ program, current, upcoming, proteinNote, hasCoac
           <p className="mx-auto mt-1 max-w-md text-sm text-ink-3">
             Koçun henüz bir antrenman programı oluşturmadı. Programın hazır olduğunda burada görünecek.
           </p>
-          <a href="/workout" className="btn-primary mx-auto mt-5 inline-flex items-center gap-2">
-            Antrenmanı görüntüle →
-          </a>
         </div>
       );
     }
