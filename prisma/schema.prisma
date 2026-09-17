@@ -1,0 +1,418 @@
+// MetaCoach — Prisma schema (POC on SQLite; swap datasource to Postgres for prod)
+// SQLite notes: no native enums/arrays → enum-like values are String,
+// list/JSON payloads are stored as JSON strings, money-free numerics use Float.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String?
+  dob          DateTime?
+  sex          String?   // male | female | other
+  heightCm     Float?
+  activityBase String    @default("moderate") // sedentary|light|moderate|active|athlete
+  activityAuto Boolean   @default(true)        // activityBase'i wearable aktivitesinden otomatik kalibre et
+  role         String    @default("user")      // user | coach
+  goal         String    @default("maintain") // cut | maintain | bulk
+  unitPref     String    @default("metric")   // metric | imperial
+  locale       String    @default("tr")
+  themePref    String    @default("system")   // system | light | dark
+  disclaimerAt        DateTime?
+  passwordResetToken  String?   @unique
+  passwordResetExpiry DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  labResults          LabResult[]
+  biometrics          Biometric[]
+  meals               Meal[]
+  dailyLogs           DailyLog[]
+  metabolismEstimates MetabolismEstimate[]
+  files               FileAsset[]
+  deviceConnections   DeviceConnection[]
+  consents            Consent[]
+  dashboardLayout     DashboardLayout?
+  settings            Settings?
+  pushSubscriptions   PushSubscription[]
+  workoutPrograms     WorkoutProgram[]
+  workoutSessions     WorkoutSession[]
+  coachAssessment     CoachAssessment?
+  healthIngestToken   HealthIngestToken?
+  healthIngestLogs    HealthIngestLog[]
+
+  coachLinksAsCoach   CoachLink[]    @relation("CoachLinkCoach")
+  coachLinksAsClient  CoachLink[]    @relation("CoachLinkClient")
+  coachInvite         CoachInvite?   @relation("CoachInviteClient")
+  plansAsClient       TrainingPlan[] @relation("TrainingPlanClient")
+  plansAsCoach        TrainingPlan[] @relation("TrainingPlanCoach")
+  commentsAsClient    CoachComment[] @relation("CoachCommentClient")
+  commentsAsCoach     CoachComment[] @relation("CoachCommentCoach")
+}
+
+model FileAsset {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind            String // lab_pdf | inbody_img
+  fileName        String
+  mime            String
+  size            Int
+  storageKey      String
+  parseStatus     String   @default("pending") // pending | processing | done | failed
+  parseConfidence Float?
+  createdAt       DateTime @default(now())
+
+  labResult LabResult?
+  biometric Biometric?
+}
+
+model LabResult {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileId          String?   @unique
+  file            FileAsset? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  panelName       String
+  labName         String?
+  collectedAt     DateTime?
+  parseConfidence Float?
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  biomarkers LabBiomarker[]
+}
+
+model LabBiomarker {
+  id          String    @id @default(cuid())
+  labResultId String
+  labResult   LabResult @relation(fields: [labResultId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  value       Float
+  unit        String
+  refLow      Float?
+  refHigh     Float?
+  flag        String    @default("normal") // low | normal | high
+  confidence  Float     @default(1)
+}
+
+model Biometric {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileId           String?   @unique
+  file             FileAsset? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  source           String // inbody | mi_scale | manual | wearable
+  measuredAt       DateTime
+  weightKg         Float
+  bodyFatPct       Float?
+  skeletalMuscleKg Float?
+  visceralFat      Float?
+  bodyWaterPct     Float?
+  bmrDevice        Float?
+  impedance        Float? // ohms — Mi Scale bioimpedance
+  createdAt        DateTime  @default(now())
+}
+
+model Meal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loggedAt  DateTime
+  mealType  String // breakfast | lunch | dinner | snack
+  name      String
+  totalKcal Float
+  proteinG  Float    @default(0)
+  carbG     Float    @default(0)
+  fatG      Float    @default(0)
+  source    String   @default("manual") // manual | barcode | photo | api
+  createdAt DateTime @default(now())
+}
+
+model DailyLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime
+  caloriesIn    Float    @default(0)
+  activeKcal    Float    @default(0) // Apple Health aktif kalori (hareket)
+  basalKcal     Float?             // Apple Health bazal/dinlenme kalorisi
+  steps         Int      @default(0)
+  weightTrend   Float?
+  tdeeDynamic   Float?
+  energyBalance Float?
+
+  @@unique([userId, date])
+}
+
+model MetabolismEstimate {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  computedAt  DateTime @default(now())
+  windowDays  Int
+  tdeeKcal    Float
+  ciLow       Float
+  ciHigh      Float
+  method      String // ewma | kalman
+  weightSlope Float?
+  rhoUsed     Float?
+}
+
+model DeviceConnection {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   String // mi_scale | apple_health | garmin
+  externalId String?
+  status     String    @default("connected") // connected | disconnected | error
+  lastSyncAt DateTime?
+  meta       String? // JSON string
+  createdAt  DateTime  @default(now())
+}
+
+model Consent {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // kvkk | gdpr | health_data
+  version   String
+  grantedAt DateTime  @default(now())
+  revokedAt DateTime?
+}
+
+model FoodItem {
+  id             String  @id @default(cuid())
+  name           String
+  brand          String?
+  barcode        String?
+  kcalPer100g    Float
+  proteinPer100g Float   @default(0)
+  carbPer100g    Float   @default(0)
+  fatPer100g     Float   @default(0)
+}
+
+model DashboardLayout {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  widgets   String // JSON: [{ id, visible, order }]
+  updatedAt DateTime @updatedAt
+}
+
+model Settings {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifyWeighIn  Boolean  @default(true)
+  notifyMeals    Boolean  @default(false)
+  weeklyReport   Boolean  @default(true)
+  tdeeWindowDays Int      @default(21)
+  updatedAt      DateTime @updatedAt
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+// ── Training / workout program ─────────────────────────────────────────────
+// The 4-phase periodized session model: activation → strength|functional →
+// cardio → cooldown. A 3-day plan alternates A (strength) and B (functional).
+
+model Exercise {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  phase         String // activation | strength | functional | cardio | cooldown
+  muscleGroup   String // legs | push | pull | core | full | mobility | cardio
+  equipment     String // barbell | dumbbell | machine | cable | bodyweight | kettlebell | cardio_machine | foam_roller | band
+  met           Float    @default(5) // metabolic equivalent, for kcal estimate
+  unit          String   @default("reps") // reps | seconds | meters
+  instructionTr String?
+  createdAt     DateTime @default(now())
+
+  sets WorkoutSet[]
+}
+
+model WorkoutProgram {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  goal        String // cut | maintain | bulk
+  daysPerWeek Int      @default(3)
+  splitType   String   @default("ab") // ab
+  source      String   @default("template") // ai | template
+  active      Boolean  @default(true)
+  notes       String? // AI rationale / coaching note
+  createdAt   DateTime @default(now())
+
+  sessions WorkoutSession[]
+}
+
+model WorkoutSession {
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programId    String?
+  program      WorkoutProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  scheduledFor DateTime
+  dayType      String // strength | functional
+  label        String // "A · Kuvvet" | "B · Fonksiyonel"
+  status       String          @default("planned") // planned | in_progress | completed | skipped
+  source       String          @default("planned") // planned | imported (wearable/Apple Health)
+  completedAt  DateTime?
+  durationMin  Int?
+  estKcal      Float?
+  createdAt    DateTime        @default(now())
+
+  sets WorkoutSet[]
+}
+
+model WorkoutSet {
+  id         String         @id @default(cuid())
+  sessionId  String
+  session    WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  phase      String // activation | strength | functional | cardio | cooldown
+  orderIdx   Int            @default(0)
+  targetSets Int            @default(3)
+  targetReps String         @default("10") // "8-12", or seconds/meters for timed work
+  weightKg   Float?
+  done       Boolean        @default(false)
+  actualReps String?
+}
+
+// ── Ön değerlendirme (antrenör görüşmesi öncesi) ───────────────────────────
+// Diyetisyen/antrenör görüşmesinden önce toplanan kısa hazırlık anketi:
+// (1) son 2-3 günlük yemek alışkanlıkları, (2) kişisel rutin (uyku/hareket),
+// (3) varsa son kan tahlili değerleri. Kullanıcı başına tek kayıt (upsert).
+model CoachAssessment {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 1 — Günlük yemek alışkanlıkları (son 2-3 gün)
+  dietRecall String? // serbest metin: son 2-3 günde yenenlerin kısa listesi
+
+  // 2 — Kişisel rutin
+  wakeTime      String? // "HH:MM" — uyanış saati
+  sleepTime     String? // "HH:MM" — uyku saati
+  activityLevel String? // sedentary | light | moderate | active | athlete
+  routineNote   String? // gün içi hareket seviyesi / ek notlar
+
+  // 3 — Son kan tahlilleri (varsa)
+  b12            Float? // pg/mL
+  vitaminD       Float? // ng/mL (25-OH D)
+  fastingInsulin Float? // µIU/mL
+  homaIR         Float? // insülin direnci (HOMA-IR)
+  tsh            Float? // mIU/L (tiroit)
+  labNote        String?
+
+  status      String    @default("draft") // draft | submitted
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ── Wearable / aktivite ingest ─────────────────────────────────────────────
+// Session'sız cihaz push'ları (iOS "Health Auto Export" / Apple Kısayol) için
+// kullanıcı başına gizli token. Webhook Bearer token ile doğrular; UI'dan
+// yeniden üretilebilir. Token → kullanıcı, aktivite verisini DailyLog/
+// WorkoutSession'a yazar.
+model HealthIngestToken {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String    @unique
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// Her içe aktarma denemesinin kaydı. Amaç: "senkron oldu ama antrenman gelmedi"
+// durumunu görünür kılmak — HAE'de Workouts ayrı bir otomasyon gerektirir ve
+// yalnızca metrik gönderen bir kurulum, başarılı senkronla aynı görünüyordu.
+model HealthIngestLog {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  at                DateTime @default(now())
+  via               String // webhook | manual
+  source            String // health_auto_export | generic
+  daysReceived      Int      @default(0)
+  workoutsReceived  Int      @default(0)
+  daysWritten       Int      @default(0)
+  workoutsCreated   Int      @default(0)
+  sessionsCompleted Int      @default(0)
+
+  @@index([userId, at])
+}
+
+// ── Koç / PT (hafif MVP) ───────────────────────────────────────────────────
+// Danışan bir koçu davet koduyla bağlar; hangi modülleri göreceğini kendi seçer.
+// Koç plan (TrainingPlan) ve yorum (CoachComment) girer; ikisi de aynı User
+// tablosundan (role = "coach").
+
+// Danışan başına tek davet kodu; koç bunu girerek bağlanır.
+model CoachInvite {
+  id          String   @id @default(cuid())
+  clientId    String   @unique
+  client      User     @relation("CoachInviteClient", fields: [clientId], references: [id], onDelete: Cascade)
+  code        String   @unique
+  permissions String   @default("[]") // davetle önden seçilen modül izinleri
+  createdAt   DateTime @default(now())
+}
+
+model CoachLink {
+  id          String   @id @default(cuid())
+  coachId     String
+  coach       User     @relation("CoachLinkCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  clientId    String
+  client      User     @relation("CoachLinkClient", fields: [clientId], references: [id], onDelete: Cascade)
+  status      String   @default("active") // active | revoked
+  permissions String   @default("[]")     // JSON: izinli modüller ["workout","activity",...]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([coachId, clientId])
+}
+
+model TrainingPlan {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    User     @relation("TrainingPlanClient", fields: [clientId], references: [id], onDelete: Cascade)
+  coachId   String
+  coach     User     @relation("TrainingPlanCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CoachComment {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     User     @relation("CoachCommentClient", fields: [clientId], references: [id], onDelete: Cascade)
+  coachId    String
+  coach      User     @relation("CoachCommentCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  authorRole String   // coach | client
+  body       String
+  createdAt  DateTime @default(now())
+}
